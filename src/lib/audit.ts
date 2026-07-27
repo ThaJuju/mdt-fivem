@@ -3,7 +3,6 @@ import "server-only";
 import { headers } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
-import type { Actor } from "./auth";
 
 type AuditOptions = {
   entity?: string;
@@ -16,8 +15,15 @@ type AuditOptions = {
  * (ex. "citizen.view"). C'est ce qui permet de retrouver qui a consulté
  * quoi et pourquoi en cas de litige. À appeler partout où c'est pertinent,
  * pas seulement sur les mutations.
+ *
+ * N'accepte que `{ id }` (et non le type `Actor` complet) pour rester
+ * appelable juste après une connexion, avant qu'un acteur complet existe.
  */
-export async function audit(actor: Actor | null, action: string, options: AuditOptions = {}): Promise<void> {
+export async function audit(
+  actor: { id: string } | null,
+  action: string,
+  options: AuditOptions = {},
+): Promise<void> {
   const headerList = await headers();
   const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 

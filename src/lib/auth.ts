@@ -8,8 +8,9 @@ import { cache } from "react";
 import type { MembershipStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 import { ActionError } from "./errors";
+import { SESSION_COOKIE_NAME } from "./session-constants";
 
-export const SESSION_COOKIE_NAME = "mdt_session";
+export { SESSION_COOKIE_NAME };
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 14; // 14 jours
 
 export type ActorMembership = {
