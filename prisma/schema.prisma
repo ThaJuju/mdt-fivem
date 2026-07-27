@@ -1,0 +1,784 @@
+// Schéma de la base de données du MDT.
+// Voir CLAUDE.md pour les conventions (permissions, audit, gel des barèmes de charges).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Comptes
+// ─────────────────────────────────────────────────────────────────────────
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  passwordHash       String
+  firstName          String
+  lastName           String
+  email              String?
+  avatarUrl          String?
+  isActive           Boolean   @default(true)
+  isSuperAdmin       Boolean   @default(false)
+  mustChangePassword Boolean   @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions    Session[]
+  memberships Membership[]
+
+  authoredReports   Report[]        @relation("ReportAuthor")
+  approvedReports   Report[]        @relation("ReportApprover")
+  reportAssignments ReportOfficer[]
+
+  authoredNotes CitizenNote[]
+
+  requestedWarrants Warrant[] @relation("WarrantRequestedBy")
+  approvedWarrants  Warrant[] @relation("WarrantApprovedBy")
+
+  createdBolos Bolo[]
+
+  callLogs        CallLog[]
+  unitMemberships UnitMember[]
+
+  authoredAnnouncements Announcement[]
+
+  certificationsIssued UserCertification[] @relation("CertificationIssuedBy")
+  certificationsHeld   UserCertification[] @relation("CertificationHolder")
+
+  disciplinesIssued Discipline[] @relation("DisciplineIssuedBy")
+  disciplinesHeld   Discipline[] @relation("DisciplineHolder")
+
+  shifts    Shift[]
+  auditLogs AuditLog[]
+
+  @@index([lastName, firstName])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum DepartmentType {
+  POLICE
+  EMS
+  DOJ
+  ADMIN
+}
+
+model Department {
+  id        String         @id @default(cuid())
+  name      String
+  shortName String         @unique
+  type      DepartmentType
+  color     String
+  logoUrl   String?
+  order     Int            @default(0)
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  grades         Grade[]
+  memberships    Membership[]
+  reports        Report[]
+  announcements  Announcement[]
+  certifications Certification[]
+  shifts         Shift[]
+
+  @@index([isActive])
+}
+
+model Grade {
+  id           String     @id @default(cuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  name         String
+  level        Int
+  permissions  String[]
+  salary       Int?
+  isDefault    Boolean    @default(false)
+
+  memberships Membership[]
+
+  @@unique([departmentId, level])
+  @@index([departmentId])
+}
+
+enum MembershipStatus {
+  ACTIVE
+  LOA
+  SUSPENDED
+  TERMINATED
+}
+
+model Membership {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  gradeId      String
+  grade        Grade            @relation(fields: [gradeId], references: [id])
+  badgeNumber  String
+  callsign     String?
+  isPrimary    Boolean          @default(false)
+  status       MembershipStatus @default(ACTIVE)
+  hiredAt      DateTime         @default(now())
+  leftAt       DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([departmentId, badgeNumber])
+  @@index([userId])
+  @@index([departmentId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Fichiers
+// ─────────────────────────────────────────────────────────────────────────
+
+model Citizen {
+  id          String    @id @default(cuid())
+  firstName   String
+  lastName    String
+  dob         DateTime  @db.Date
+  gender      String
+  height      Int?
+  weight      Int?
+  hairColor   String?
+  eyeColor    String?
+  address     String?
+  postal      String?
+  phone       String?
+  occupation  String?
+  imageUrl    String?
+  fingerprint String?   @unique
+  isDeceased  Boolean   @default(false)
+  deceasedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  notes              CitizenNote[]
+  licenses           License[]
+  ownedVehicles      Vehicle[]
+  ownedWeapons       Weapon[]
+  properties         Property[]
+  reportInvolvements ReportInvolvement[]
+  warrants           Warrant[]
+  bolos              Bolo[]
+  medicalRecord      MedicalRecord?
+  charges            Charge[]
+
+  @@index([lastName, firstName])
+}
+
+model CitizenNote {
+  id        String   @id @default(cuid())
+  citizenId String
+  citizen   Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  isFlagged Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([citizenId])
+}
+
+enum DocumentStatus {
+  VALID
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+model License {
+  id        String         @id @default(cuid())
+  citizenId String
+  citizen   Citizen        @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  type      String
+  status    DocumentStatus @default(VALID)
+  points    Int            @default(0)
+  issuedAt  DateTime       @default(now())
+  expiresAt DateTime?
+
+  @@index([citizenId])
+}
+
+model Vehicle {
+  id           String         @id @default(cuid())
+  plate        String         @unique
+  make         String
+  model        String
+  color        String?
+  class        String?
+  vin          String?
+  ownerId      String?
+  owner        Citizen?       @relation(fields: [ownerId], references: [id])
+  registration DocumentStatus @default(VALID)
+  insurance    DocumentStatus @default(VALID)
+  isStolen     Boolean        @default(false)
+  isImpounded  Boolean        @default(false)
+  notes        String?
+  imageUrl     String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  reportVehicles ReportVehicle[]
+  bolos          Bolo[]
+
+  @@index([ownerId])
+  @@index([isStolen])
+}
+
+model Weapon {
+  id           String   @id @default(cuid())
+  serialNumber String   @unique
+  model        String
+  type         String?
+  ownerId      String?
+  owner        Citizen? @relation(fields: [ownerId], references: [id])
+  isStolen     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model Property {
+  id        String   @id @default(cuid())
+  address   String
+  type      String?
+  citizenId String?
+  citizen   Citizen? @relation(fields: [citizenId], references: [id])
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([citizenId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Code pénal
+// ─────────────────────────────────────────────────────────────────────────
+
+model PenalCategory {
+  id    String @id @default(cuid())
+  name  String @unique
+  order Int    @default(0)
+
+  offenses Offense[]
+}
+
+enum OffenseType {
+  INFRACTION
+  MISDEMEANOR
+  FELONY
+}
+
+model Offense {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  name        String
+  description String?
+  categoryId  String
+  category    PenalCategory @relation(fields: [categoryId], references: [id])
+  type        OffenseType
+  fine        Int
+  jailMinutes Int
+  points      Int
+  bail        Int?
+  isActive    Boolean       @default(true)
+
+  charges Charge[]
+
+  @@index([categoryId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Rapports
+// ─────────────────────────────────────────────────────────────────────────
+
+enum ReportType {
+  INCIDENT
+  ARREST
+  CITATION
+  INVESTIGATION
+  FIELD_INTERVIEW
+  USE_OF_FORCE
+  EMS_INTERVENTION
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  number       Int          @unique @default(autoincrement())
+  type         ReportType
+  title        String
+  content      String
+  status       ReportStatus @default(DRAFT)
+  location     String?
+  occurredAt   DateTime
+  authorId     String
+  author       User         @relation("ReportAuthor", fields: [authorId], references: [id])
+  departmentId String
+  department   Department   @relation(fields: [departmentId], references: [id])
+  approvedById String?
+  approvedBy   User?        @relation("ReportApprover", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  rejectReason String?
+  callId       String?
+  call         Call?        @relation(fields: [callId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  involvements ReportInvolvement[]
+  officers     ReportOfficer[]
+  vehicles     ReportVehicle[]
+  evidence     Evidence[]
+  charges      Charge[]
+  warrants     Warrant[]
+  emsDetail    EmsDetail?
+
+  @@index([status, type])
+  @@index([departmentId])
+  @@index([authorId])
+}
+
+enum InvolvementRole {
+  SUSPECT
+  VICTIM
+  WITNESS
+  COMPLAINANT
+  PATIENT
+  OTHER
+}
+
+model ReportInvolvement {
+  id        String          @id @default(cuid())
+  reportId  String
+  report    Report          @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  citizenId String
+  citizen   Citizen         @relation(fields: [citizenId], references: [id])
+  role      InvolvementRole
+  statement String?
+
+  @@index([reportId])
+  @@index([citizenId])
+}
+
+model ReportOfficer {
+  id       String  @id @default(cuid())
+  reportId String
+  report   Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+  isLead   Boolean @default(false)
+
+  @@unique([reportId, userId])
+  @@index([userId])
+}
+
+model ReportVehicle {
+  id        String  @id @default(cuid())
+  reportId  String
+  report    Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  role      String?
+
+  @@index([reportId])
+  @@index([vehicleId])
+}
+
+enum EvidenceKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  OBJECT
+}
+
+model Evidence {
+  id          String       @id @default(cuid())
+  reportId    String
+  report      Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  label       String
+  description String?
+  kind        EvidenceKind
+  url         String?
+  createdAt   DateTime     @default(now())
+
+  @@index([reportId])
+}
+
+model Charge {
+  id          String  @id @default(cuid())
+  reportId    String
+  report      Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  citizenId   String
+  citizen     Citizen @relation(fields: [citizenId], references: [id])
+  offenseId   String
+  offense     Offense @relation(fields: [offenseId], references: [id])
+  count       Int     @default(1)
+  fine        Int
+  jailMinutes Int
+  points      Int
+  isGuilty    Boolean @default(true)
+  isPaid      Boolean @default(false)
+  notes       String?
+
+  @@index([reportId])
+  @@index([citizenId])
+  @@index([offenseId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mandats
+// ─────────────────────────────────────────────────────────────────────────
+
+enum WarrantType {
+  ARREST
+  SEARCH
+}
+
+enum WarrantStatus {
+  PENDING
+  ACTIVE
+  EXECUTED
+  EXPIRED
+  DENIED
+}
+
+model Warrant {
+  id            String        @id @default(cuid())
+  type          WarrantType
+  citizenId     String
+  citizen       Citizen       @relation(fields: [citizenId], references: [id])
+  reason        String
+  address       String?
+  status        WarrantStatus @default(PENDING)
+  requestedById String
+  requestedBy   User          @relation("WarrantRequestedBy", fields: [requestedById], references: [id])
+  approvedById  String?
+  approvedBy    User?         @relation("WarrantApprovedBy", fields: [approvedById], references: [id])
+  approvedAt    DateTime?
+  expiresAt     DateTime?
+  reportId      String?
+  report        Report?       @relation(fields: [reportId], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status])
+  @@index([citizenId])
+}
+
+enum BoloType {
+  PERSON
+  VEHICLE
+  OTHER
+}
+
+model Bolo {
+  id          String    @id @default(cuid())
+  type        BoloType
+  title       String
+  description String
+  citizenId   String?
+  citizen     Citizen?  @relation(fields: [citizenId], references: [id])
+  vehicleId   String?
+  vehicle     Vehicle?  @relation(fields: [vehicleId], references: [id])
+  plate       String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([isActive, type])
+  @@index([citizenId])
+  @@index([vehicleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Médical
+// ─────────────────────────────────────────────────────────────────────────
+
+model MedicalRecord {
+  id           String   @id @default(cuid())
+  citizenId    String   @unique
+  citizen      Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  bloodType    String?
+  allergies    String[]
+  conditions   String[]
+  medications  String[]
+  notes        String?
+  isFitForDuty Boolean?
+  updatedAt    DateTime @updatedAt
+}
+
+enum Triage {
+  GREEN
+  YELLOW
+  ORANGE
+  RED
+  BLACK
+}
+
+enum EmsOutcome {
+  TREATED_ON_SCENE
+  TRANSPORTED
+  REFUSED_CARE
+  DECEASED
+}
+
+model EmsDetail {
+  id             String     @id @default(cuid())
+  reportId       String     @unique
+  report         Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  triage         Triage
+  chiefComplaint String?
+  injuries       String?
+  treatment      String?
+  medications    String?
+  outcome        EmsOutcome
+  hospital       String?
+  arrivedAt      DateTime?
+  clearedAt      DateTime?
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dispatch
+// ─────────────────────────────────────────────────────────────────────────
+
+enum CallSource {
+  EMERGENCY
+  NON_EMERGENCY
+  OFFICER
+}
+
+enum CallStatus {
+  PENDING
+  ASSIGNED
+  EN_ROUTE
+  ON_SCENE
+  CLOSED
+}
+
+model Call {
+  id          String     @id @default(cuid())
+  number      Int        @unique @default(autoincrement())
+  source      CallSource
+  code        String?
+  priority    Int        @default(3)
+  title       String
+  description String?
+  location    String
+  postal      String?
+  callerName  String?
+  callerPhone String?
+  status      CallStatus @default(PENDING)
+  tags        String[]
+  closedAt    DateTime?
+  closeNote   String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  logs    CallLog[]
+  units   CallUnit[]
+  reports Report[]
+
+  @@index([status, priority])
+}
+
+model CallLog {
+  id        String   @id @default(cuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  message   String
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([callId])
+}
+
+enum UnitStatus {
+  AVAILABLE
+  BUSY
+  EN_ROUTE
+  ON_SCENE
+  PANIC
+  OFF_DUTY
+}
+
+model Unit {
+  id        String     @id @default(cuid())
+  callsign  String
+  type      String
+  status    UnitStatus @default(OFF_DUTY)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  members UnitMember[]
+  calls   CallUnit[]
+
+  @@index([status])
+  @@index([isActive])
+}
+
+model UnitMember {
+  id     String  @id @default(cuid())
+  unitId String
+  unit   Unit    @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  userId String
+  user   User    @relation(fields: [userId], references: [id])
+  isLead Boolean @default(false)
+
+  @@unique([unitId, userId])
+  @@index([userId])
+}
+
+model CallUnit {
+  id         String   @id @default(cuid())
+  callId     String
+  call       Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  unitId     String
+  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@unique([callId, unitId])
+  @@index([unitId])
+}
+
+model StatusCode {
+  id    String  @id @default(cuid())
+  code  String  @unique
+  label String
+  color String
+  type  String?
+  order Int     @default(0)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RH
+// ─────────────────────────────────────────────────────────────────────────
+
+model Announcement {
+  id           String      @id @default(cuid())
+  title        String
+  content      String
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  authorId     String
+  author       User        @relation(fields: [authorId], references: [id])
+  isPinned     Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([departmentId])
+}
+
+model Certification {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  validMonths  Int?
+
+  holders UserCertification[]
+
+  @@index([departmentId])
+}
+
+model UserCertification {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation("CertificationHolder", fields: [userId], references: [id], onDelete: Cascade)
+  certificationId String
+  certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+  issuedById      String?
+  issuedBy        User?         @relation("CertificationIssuedBy", fields: [issuedById], references: [id])
+  issuedAt        DateTime      @default(now())
+  expiresAt       DateTime?
+
+  @@index([userId])
+  @@index([certificationId])
+}
+
+enum DisciplineType {
+  COMMENDATION
+  VERBAL_WARNING
+  WRITTEN_WARNING
+  SUSPENSION
+  DEMOTION
+  TERMINATION
+}
+
+model Discipline {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation("DisciplineHolder", fields: [userId], references: [id], onDelete: Cascade)
+  type         DisciplineType
+  reason       String
+  issuedById   String
+  issuedBy     User           @relation("DisciplineIssuedBy", fields: [issuedById], references: [id])
+  durationDays Int?
+  createdAt    DateTime       @default(now())
+
+  @@index([userId])
+}
+
+model Shift {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  startedAt    DateTime   @default(now())
+  endedAt      DateTime?
+
+  @@index([userId])
+  @@index([departmentId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([action])
+}

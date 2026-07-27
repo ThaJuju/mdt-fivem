@@ -1,26 +1,135 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-plex-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Couleur pilotée par le département actif (voir attribut data-department). */
+  --color-department: var(--department-accent);
+  --color-department-foreground: var(--department-accent-foreground);
+  /* Réservé : mandats actifs, 10-99, triage rouge. Nulle part ailleurs. */
+  --color-alert: var(--alert);
+  --color-alert-foreground: var(--alert-foreground);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* Console radio : carbone + surfaces sombres, jamais de thème clair. */
+  --background: #0d1014;
+  --foreground: #e6eaf0;
+  --card: #161b22;
+  --card-foreground: #e6eaf0;
+  --popover: #161b22;
+  --popover-foreground: #e6eaf0;
+  --secondary: #1b212b;
+  --secondary-foreground: #e6eaf0;
+  --muted: #161b22;
+  --muted-foreground: #8a94a3;
+  --accent: #1b212b;
+  --accent-foreground: #e6eaf0;
+  /* Rouge dangereux mais distinct de l'alerte réservée (#EF4444). */
+  --destructive: #a64b43;
+  --destructive-foreground: #e6eaf0;
+  --border: #232a33;
+  --input: #232a33;
+  --radius: 0.375rem;
+
+  /* Département actif : LSPD (cobalt) par défaut avant connexion. */
+  --department-accent: #3b6fe0;
+  --department-accent-foreground: #e6eaf0;
+  --primary: var(--department-accent);
+  --primary-foreground: var(--department-accent-foreground);
+  --ring: var(--department-accent);
+
+  --alert: #ef4444;
+  --alert-foreground: #e6eaf0;
+
+  --chart-1: #3b6fe0;
+  --chart-2: #c9a227;
+  --chart-3: #f2a03d;
+  --chart-4: #8a94a3;
+  --chart-5: #4b5563;
+
+  --sidebar: #161b22;
+  --sidebar-foreground: #e6eaf0;
+  --sidebar-primary: var(--department-accent);
+  --sidebar-primary-foreground: var(--department-accent-foreground);
+  --sidebar-accent: #1b212b;
+  --sidebar-accent-foreground: #e6eaf0;
+  --sidebar-border: #232a33;
+  --sidebar-ring: var(--department-accent);
+}
+
+/* Couleur d'accent propagée à toute l'interface selon le département actif. */
+[data-department="bcso"] {
+  --department-accent: #c9a227;
+  --department-accent-foreground: #0d1014;
+}
+
+[data-department="ems"] {
+  --department-accent: #f2a03d;
+  --department-accent-foreground: #0d1014;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
