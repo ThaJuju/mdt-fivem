@@ -27,7 +27,7 @@ export function NotesSection({
     <div className="flex flex-col gap-3">
       <h2 className="font-medium">Notes</h2>
       {notes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune note pour ce citoyen.</p>
+        <p className="text-sm text-muted-foreground">Aucune note pour ce citoyen. Consignez ici ce qu&apos;un collègue doit savoir avant un contrôle.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {notes.map((note) => (

@@ -3,7 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { requireActor, requirePagePermission, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { parsePageParams, pageCount } from "@/lib/pagination";
 import { RosterSection, type RosterRow, type DepartmentOption } from "./roster-section";
+import { RosterPagination } from "./roster-pagination";
 import {
   CertificationsSection,
   ShiftsSection,
@@ -15,10 +17,16 @@ import {
 
 export const metadata: Metadata = { title: "Ressources humaines — MDT" };
 
-export default async function RhPage() {
+export default async function RhPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requireActor();
   requirePagePermission(actor, "hr.roster.view");
 
+  const params = await searchParams;
+  const { page, pageSize, skip, take } = parsePageParams(params, 25);
   const canViewAllShifts = can(actor, "hr.shifts.view");
   const actorDepartmentIds = actor.memberships
     .filter((m) => m.status === "ACTIVE")
@@ -30,11 +38,13 @@ export default async function RhPage() {
     ? {}
     : { departmentId: { in: actorDepartmentIds } };
 
-  const [memberships, departments, certifications, shifts, announcements, openShift] = await Promise.all([
+  const [memberships, rosterTotal, departments, certifications, shifts, announcements, openShift] =
+    await Promise.all([
     prisma.membership.findMany({
       where: rosterWhere,
       orderBy: [{ department: { order: "asc" } }, { grade: { level: "desc" } }],
-      take: 200,
+      skip,
+      take,
       include: {
         user: {
           select: {
@@ -49,6 +59,7 @@ export default async function RhPage() {
         grade: { select: { name: true, level: true } },
       },
     }),
+    prisma.membership.count({ where: rosterWhere }),
     prisma.department.findMany({
       where: actor.isSuperAdmin ? { isActive: true } : { id: { in: actorDepartmentIds } },
       orderBy: { order: "asc" },
@@ -92,6 +103,7 @@ export default async function RhPage() {
   ]);
 
   await audit(actor, "hr.roster.view");
+  const rosterPageCount = pageCount(rosterTotal, pageSize);
 
   const roster: RosterRow[] = memberships.map((membership) => ({
     membershipId: membership.id,
@@ -168,6 +180,7 @@ export default async function RhPage() {
         canTerminate={can(actor, "hr.terminate")}
         canDiscipline={can(actor, "hr.discipline")}
       />
+      <RosterPagination page={page} pageCount={rosterPageCount} total={rosterTotal} />
 
       <CertificationsSection
         certifications={certificationRows}

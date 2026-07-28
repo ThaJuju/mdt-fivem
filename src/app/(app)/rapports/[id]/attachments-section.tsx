@@ -134,7 +134,7 @@ export function ReportVehiclesSection({
       </div>
 
       {vehicles.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun véhicule rattaché à ce rapport.</p>
+        <p className="text-sm text-muted-foreground">Aucun véhicule rattaché. Ajoutez-en un s&apos;il a joué un rôle dans les faits.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {vehicles.map((vehicle) => (
@@ -244,7 +244,7 @@ export function EvidenceSection({
       </div>
 
       {evidence.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune pièce au dossier.</p>
+        <p className="text-sm text-muted-foreground">Aucune pièce au dossier. Joignez photos, vidéos ou relevés pour appuyer le récit.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {evidence.map((item) => (

@@ -326,7 +326,7 @@ export function ShiftsSection({
       </div>
 
       {shifts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune prise de service enregistrée.</p>
+        <p className="text-sm text-muted-foreground">Aucune prise de service enregistrée. Pointez pour commencer à comptabiliser vos heures.</p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-sm">

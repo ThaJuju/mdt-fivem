@@ -1,23 +1,34 @@
 import type { Metadata } from "next";
 import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parsePageParams, pageCount } from "@/lib/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateStatusCodeDialog, EditStatusCodeDialog } from "./status-code-dialogs";
 import { DeleteStatusCodeButton } from "./delete-status-code-button";
+import { CodesPagination } from "./codes-pagination";
 
 export const metadata: Metadata = { title: "10-codes — Administration — MDT" };
 
-export default async function CodesPage() {
+export default async function CodesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requireActor();
   requirePagePermission(actor, "admin.codes.manage");
 
-  const statusCodes = await prisma.statusCode.findMany({ orderBy: { order: "asc" } });
+  const params = await searchParams;
+  const { page, pageSize, skip, take } = parsePageParams(params, 50);
+  const [statusCodes, total] = await Promise.all([
+    prisma.statusCode.findMany({ orderBy: { order: "asc" }, skip, take }),
+    prisma.statusCode.count(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          {statusCodes.length} code{statusCodes.length > 1 ? "s" : ""}
+          {total} code{total > 1 ? "s" : ""}
         </p>
         <CreateStatusCodeDialog />
       </div>
@@ -71,6 +82,8 @@ export default async function CodesPage() {
           </Table>
         </div>
       )}
+
+      <CodesPagination page={page} pageCount={pageCount(total, pageSize)} total={total} />
     </div>
   );
 }

@@ -28,7 +28,7 @@ export function LicensesSection({
         {canManage ? <AddLicenseDialog citizenId={citizenId} /> : null}
       </div>
       {licenses.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune licence enregistrée.</p>
+        <p className="text-sm text-muted-foreground">Aucune licence enregistrée. Ajoutez-en une pour suivre points et validité.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {licenses.map((license) => (

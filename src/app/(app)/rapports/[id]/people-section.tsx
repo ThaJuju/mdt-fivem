@@ -144,7 +144,7 @@ export function InvolvementsSection({
       </div>
 
       {involvements.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune personne rattachée à ce rapport.</p>
+        <p className="text-sm text-muted-foreground">Aucune personne rattachée. Ajoutez-en une pour pouvoir retenir des charges.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {involvements.map((involvement) => (

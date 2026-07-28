@@ -67,7 +67,7 @@ export default async function CodePenalPage() {
               </div>
 
               {category.offenses.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune infraction dans cette catégorie.</p>
+                <p className="text-sm text-muted-foreground">Aucune infraction dans cette catégorie. Ajoutez-en une pour la rendre imputable.</p>
               ) : (
                 <div className="overflow-x-auto rounded-md border border-border">
                   <table className="w-full text-sm">

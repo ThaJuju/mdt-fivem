@@ -85,12 +85,23 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const canApprove = can(actor, "reports.approve");
 
   // Le formulaire ne propose que les services dont l'agent est membre actif.
+  // Les deux requêtes sont indépendantes : on les lance en parallèle.
   const departmentIds = actor.memberships.filter((m) => m.status === "ACTIVE").map((m) => m.departmentId);
-  const departments = await prisma.department.findMany({
-    where: canEditAny || actor.isSuperAdmin ? { isActive: true } : { id: { in: departmentIds } },
-    orderBy: { order: "asc" },
-    select: { id: true, shortName: true, name: true },
-  });
+  const [departments, offenses] = await Promise.all([
+    prisma.department.findMany({
+      where: canEditAny || actor.isSuperAdmin ? { isActive: true } : { id: { in: departmentIds } },
+      orderBy: { order: "asc" },
+      select: { id: true, shortName: true, name: true },
+    }),
+    can(actor, "charges.manage")
+      ? prisma.offense.findMany({
+          where: { isActive: true },
+          orderBy: [{ category: { order: "asc" } }, { code: "asc" }],
+          include: { category: { select: { name: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
+
   // Le service courant doit rester sélectionnable même si l'agent n'en est plus membre.
   if (!departments.some((d) => d.id === report.department.id)) {
     departments.unshift({
@@ -99,14 +110,6 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       name: report.department.name,
     });
   }
-
-  const offenses = can(actor, "charges.manage")
-    ? await prisma.offense.findMany({
-        where: { isActive: true },
-        orderBy: [{ category: { order: "asc" } }, { code: "asc" }],
-        include: { category: { select: { name: true } } },
-      })
-    : [];
 
   return (
     <div className="flex flex-col gap-6">
