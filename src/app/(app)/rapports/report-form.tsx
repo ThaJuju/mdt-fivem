@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiImageField } from "@/components/multi-image-field";
 import { REPORT_TYPE_LABELS } from "@/lib/labels";
 import { createReport, updateReport, type FormState } from "./actions";
 
@@ -26,10 +27,16 @@ export function ReportForm({
   departments,
   report,
   readOnly = false,
+  allowPhotos = false,
 }: {
   departments: { id: string; shortName: string; name: string }[];
   report?: ExistingReport;
   readOnly?: boolean;
+  /**
+   * Uniquement à la rédaction : une fois le rapport créé, les photos passent
+   * par la section « Pièces jointes », qui permet de les nommer et décrire.
+   */
+  allowPhotos?: boolean;
 }) {
   const action = report ? updateReport : createReport;
   const [state, formAction, isPending] = useActionState(action, initialState);
@@ -128,6 +135,17 @@ export function ReportForm({
           </p>
         ))}
       </div>
+
+      {allowPhotos && !readOnly ? (
+        <div className="flex flex-col gap-2">
+          <Label>Photos (optionnel)</Label>
+          <MultiImageField name="evidenceUrls" />
+          <p className="text-xs text-muted-foreground">
+            Elles seront jointes au rapport. Vous pourrez les nommer et en ajouter d&apos;autres une fois
+            le rapport créé.
+          </p>
+        </div>
+      ) : null}
 
       {state.error ? (
         <p role="alert" className="text-sm text-destructive">

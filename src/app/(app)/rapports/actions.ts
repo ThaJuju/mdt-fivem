@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireActor, assertCan, can, type Actor } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { ActionError } from "@/lib/errors";
+import { isSafeUploadName } from "@/lib/uploads";
 import {
   reportSchema,
   involvementSchema,
@@ -49,6 +50,23 @@ async function assertCanEditReport(actor: Actor, reportId: string) {
   return report;
 }
 
+
+/**
+ * Les photos jointes pendant la rédaction sont déjà envoyées et validées par
+ * `/api/upload`, qui ne renvoie que des noms qu'il a lui-même générés. On
+ * revalide malgré tout la forme de chaque URL : le champ caché reste sous le
+ * contrôle du navigateur, donc rien n'empêche de le remplacer avant envoi.
+ */
+function safeUploadUrls(values: FormDataEntryValue[]): string[] {
+  const urls: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const filename = value.startsWith("/api/uploads/") ? value.slice("/api/uploads/".length) : null;
+    if (filename && isSafeUploadName(filename)) urls.push(value);
+  }
+  return urls.slice(0, 20);
+}
+
 export async function createReport(_prevState: FormState, formData: FormData): Promise<FormState> {
   try {
     const actor = await requireActor();
@@ -78,6 +96,20 @@ export async function createReport(_prevState: FormState, formData: FormData): P
     await prisma.reportOfficer.create({
       data: { reportId: report.id, userId: actor.id, isLead: true },
     });
+
+    // Photos jointes pendant la rédaction : elles deviennent des pièces du
+    // dossier, renommables ensuite depuis la fiche du rapport.
+    const photoUrls = safeUploadUrls(formData.getAll("evidenceUrls"));
+    if (photoUrls.length > 0) {
+      await prisma.evidence.createMany({
+        data: photoUrls.map((url, index) => ({
+          reportId: report.id,
+          label: `Photo ${index + 1}`,
+          kind: "IMAGE" as const,
+          url,
+        })),
+      });
+    }
 
     await audit(actor, "report.create", {
       entity: "Report",

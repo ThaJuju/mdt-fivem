@@ -33,7 +33,7 @@ export default async function NouveauRapportPage() {
             <CardTitle>Informations</CardTitle>
           </CardHeader>
           <CardContent>
-            <ReportForm departments={departments} />
+            <ReportForm departments={departments} allowPhotos />
           </CardContent>
         </Card>
       )}
