@@ -32,6 +32,15 @@ chaud.
 volontairement si `ADMIN_PASSWORD` est absent — ne jamais lui donner de valeur
 par défaut dans le code.
 
+## Ne pas casser la session de l'utilisateur en nettoyant
+
+Après un test, ne PAS repasser `admin.mustChangePassword` à `true` ni vider
+la table `Session` « pour revenir à l'état de seed ». Le compte `admin` est
+utilisé pour de vrai : réactiver le drapeau force un changement de mot de
+passe à chaque connexion, et purger les sessions déconnecte le navigateur
+ouvert. Nettoyer uniquement les données créées par le test lui-même
+(citoyens, rapports, uploads…), et laisser le compte tranquille.
+
 ## Permissions
 
 Catalogue unique dans `src/lib/permissions.ts`, groupé par domaine
