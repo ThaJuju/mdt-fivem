@@ -110,4 +110,30 @@ Voir le brief original pour le détail des 9 phases (0 à 8).
   Primitives : `DataTable`, `SearchBox`, `pagination.ts`.
 - **Phase 2** — fichiers : citoyens (notes signalées en bandeau, licences),
   véhicules, armes, recherche globale unifiée (`Ctrl/⌘ K`).
-- **Phases 3 à 8** — à faire.
+- **Phase 3** — code pénal (catégories + infractions) et rapports : éditeur,
+  personnes impliquées, agents, véhicules, pièces jointes, charges à barème
+  figé avec total automatique, workflow brouillon → soumis → validé/refusé.
+- **Phases 4 à 8** — à faire.
+
+## Tester une server action en HTTP
+
+Les formulaires ouverts dans un `Dialog` ne sont pas rendus côté serveur :
+impossible d'extraire leur encodage d'action depuis le HTML. Pour les
+exercer :
+
+1. Récupérer l'identifiant de l'action — `.next/server/app/…/page.js`
+   contient un mapping URL-encodé `{"id":"…","exportedName":"addCharge"}`.
+2. POSTer sur l'URL de la page avec l'encodage d'un formulaire
+   `useActionState`, qui passe `prevState` en argument lié :
+
+```
+curl -X POST "$BASE/rapports/$ID" -H "Cookie: mdt_session=$TOK" \
+  -H "Origin: $BASE" \
+  -F '$ACTION_REF_1=' \
+  -F "\$ACTION_1:0={\"id\":\"$ACTION_ID\",\"bound\":\"\$@1\"}" \
+  -F '$ACTION_1:1=[{}]' \
+  -F "champ=valeur"
+```
+
+Sans l'argument lié, Next passe la `FormData` en *premier* argument et
+l'action plante sur `formData.get is not a function`.
