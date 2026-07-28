@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProfileForm } from "./profile-form";
 import { ResetPasswordForm } from "./reset-password-form";
 import { MembershipsSection } from "./memberships-section";
+import { DeleteUserButton } from "./delete-user-button";
 
 export const metadata: Metadata = { title: "Détail du compte — Administration — MDT" };
 
@@ -101,6 +102,12 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           grades: department.grades,
         }))}
       />
+
+      {!isSelf ? (
+        <div>
+          <DeleteUserButton userId={user.id} username={user.username} />
+        </div>
+      ) : null}
     </div>
   );
 }

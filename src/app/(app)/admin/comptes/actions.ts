@@ -242,3 +242,104 @@ export async function removeMembership(userId: string, membershipId: string): Pr
   await audit(actor, "membership.delete", { entity: "Membership", entityId: membershipId });
   revalidatePath(`/admin/comptes/${userId}`);
 }
+
+/**
+ * Supprime définitivement un compte — uniquement s'il n'a laissé aucune trace.
+ *
+ * Un compte qui a rédigé un rapport, signé une note, demandé un mandat ou
+ * simplement consulté un dossier ne peut pas être effacé : ces écritures
+ * doivent rester attribuables, c'est toute la raison d'être du journal
+ * d'audit. Dans ce cas on désactive le compte, ce qui lui retire l'accès sans
+ * réécrire l'histoire.
+ *
+ * La suppression sert donc au cas réel qu'elle couvre : un compte créé par
+ * erreur, jamais utilisé.
+ */
+export async function deleteUser(_prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const actor = await requireActor();
+    assertCan(actor, "admin.users.manage");
+
+    const userId = String(formData.get("userId"));
+    if (userId === actor.id) {
+      return { error: "Vous ne pouvez pas supprimer votre propre compte." };
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { error: "Ce compte n'existe pas ou a déjà été supprimé." };
+    if (user.isSuperAdmin && !actor.isSuperAdmin) {
+      return { error: "Seul un super-admin peut supprimer un compte super-admin." };
+    }
+
+    // Tout ce qui rattache une écriture à ce compte empêche sa suppression.
+    const [
+      reports,
+      approvals,
+      officerOn,
+      notes,
+      warrantsRequested,
+      warrantsApproved,
+      bolos,
+      callLogs,
+      units,
+      announcements,
+      certificationsIssued,
+      disciplinesIssued,
+      auditEntries,
+    ] = await Promise.all([
+      prisma.report.count({ where: { authorId: userId } }),
+      prisma.report.count({ where: { approvedById: userId } }),
+      prisma.reportOfficer.count({ where: { userId } }),
+      prisma.citizenNote.count({ where: { authorId: userId } }),
+      prisma.warrant.count({ where: { requestedById: userId } }),
+      prisma.warrant.count({ where: { approvedById: userId } }),
+      prisma.bolo.count({ where: { createdById: userId } }),
+      prisma.callLog.count({ where: { authorId: userId } }),
+      prisma.unitMember.count({ where: { userId } }),
+      prisma.announcement.count({ where: { authorId: userId } }),
+      prisma.userCertification.count({ where: { issuedById: userId } }),
+      prisma.discipline.count({ where: { issuedById: userId } }),
+      prisma.auditLog.count({ where: { userId } }),
+    ]);
+
+    const traces: { label: string; count: number }[] = [
+      { label: "rapport", count: reports },
+      { label: "validation de rapport", count: approvals },
+      { label: "participation à un rapport", count: officerOn },
+      { label: "note de dossier", count: notes },
+      { label: "demande de mandat", count: warrantsRequested },
+      { label: "décision sur un mandat", count: warrantsApproved },
+      { label: "BOLO", count: bolos },
+      { label: "entrée de journal d'appel", count: callLogs },
+      { label: "appartenance à une unité", count: units },
+      { label: "annonce", count: announcements },
+      { label: "certification délivrée", count: certificationsIssued },
+      { label: "sanction prononcée", count: disciplinesIssued },
+      { label: "entrée au journal d'audit", count: auditEntries },
+    ].filter((trace) => trace.count > 0);
+
+    if (traces.length > 0) {
+      const detail = traces
+        .map((trace) => `${trace.count} ${trace.label}${trace.count > 1 ? "s" : ""}`)
+        .join(", ");
+      return {
+        error:
+          `Ce compte a laissé une trace dans le système (${detail}) : le supprimer rendrait ces écritures ` +
+          `inattribuables. Décochez « Compte actif » pour lui retirer l'accès en conservant l'historique.`,
+      };
+    }
+
+    // Aucune trace : les relations restantes (sessions, affectations) cascadent.
+    await prisma.user.delete({ where: { id: userId } });
+    await audit(actor, "user.delete", {
+      entity: "User",
+      entityId: userId,
+      metadata: { username: user.username },
+    });
+    revalidatePath("/admin/comptes");
+  } catch (err) {
+    if (err instanceof ActionError) return { error: err.message };
+    throw err;
+  }
+  redirect("/admin/comptes");
+}
