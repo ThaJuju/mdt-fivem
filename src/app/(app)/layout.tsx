@@ -1,13 +1,35 @@
 import { redirect } from "next/navigation";
-import { getActor } from "@/lib/auth";
+import { getActor, can } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { ActorProvider, type ClientActor } from "@/components/actor-provider";
-import { TopBar } from "@/components/top-bar";
+import { TopBar, type UnitStatusInfo } from "@/components/top-bar";
 import { AppNav } from "@/components/app-nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor();
   if (!actor) redirect("/connexion");
   if (actor.mustChangePassword) redirect("/changer-mot-de-passe");
+
+  // Unité de l'agent, pour la barre de statut façon console radio.
+  const unitMembership = can(actor, "dispatch.view")
+    ? await prisma.unitMember.findFirst({
+        where: { userId: actor.id },
+        include: {
+          unit: {
+            include: { calls: { include: { call: { select: { number: true, code: true } } }, take: 1 } },
+          },
+        },
+      })
+    : null;
+
+  const unitInfo: UnitStatusInfo | null = unitMembership
+    ? {
+        callsign: unitMembership.unit.callsign,
+        status: unitMembership.unit.status,
+        callNumber: unitMembership.unit.calls[0]?.call.number ?? null,
+        callCode: unitMembership.unit.calls[0]?.call.code ?? null,
+      }
+    : null;
 
   const clientActor: ClientActor = {
     id: actor.id,
@@ -31,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }}
       />
       <div className="flex min-h-screen flex-col">
-        <TopBar />
+        <TopBar unit={unitInfo} />
         <AppNav />
         <main className="flex-1 p-6">{children}</main>
       </div>
