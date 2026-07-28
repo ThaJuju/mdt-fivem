@@ -71,7 +71,7 @@ export function DataTable<TData>({ columns, data, page, pageCount, total, emptyS
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-md border border-border">
+      <div className="overflow-x-auto rounded-md border border-border bg-card shadow-[0_10px_30px_rgb(0_0_0/0.1)]">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -127,7 +127,7 @@ export function DataTable<TData>({ columns, data, page, pageCount, total, emptyS
       </div>
 
       {total > 0 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
           <span>
             {total} résultat{total > 1 ? "s" : ""} — page {page} sur {pageCount}
           </span>

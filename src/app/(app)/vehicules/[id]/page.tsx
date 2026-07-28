@@ -38,7 +38,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="flex flex-col gap-6">
       {vehicle.isStolen ? (
-        <div className="flex items-center gap-2 rounded-md border border-alert bg-alert/10 p-4 text-alert">
+        <div className="flex items-center gap-2 rounded-md border border-department/60 bg-department/10 p-4 text-department">
           <AlertTriangle className="size-4" />
           <span className="font-medium">Ce véhicule est signalé volé.</span>
         </div>

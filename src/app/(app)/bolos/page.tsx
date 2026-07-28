@@ -83,14 +83,14 @@ export default async function BolosPage({
             <article
               key={bolo.id}
               className={`flex flex-col gap-2 rounded-md border p-4 ${
-                bolo.isActive ? "border-alert bg-alert/5" : "border-border bg-card opacity-80"
+                bolo.isActive ? "border-department/60 bg-department/5" : "border-border bg-card opacity-80"
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{TYPE_LABELS[bolo.type] ?? bolo.type}</Badge>
                   {bolo.isActive ? (
-                    <Badge className="bg-alert text-alert-foreground">En cours</Badge>
+                    <Badge className="bg-department text-department-foreground">En cours</Badge>
                   ) : (
                     <Badge variant="outline">Clôturé</Badge>
                   )}

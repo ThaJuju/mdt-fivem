@@ -34,7 +34,9 @@ export function NotesSection({
             <div key={note.id} className="flex items-start justify-between gap-3 rounded-md border border-border bg-card p-3">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  {note.isFlagged ? <Badge className="bg-alert text-alert-foreground">Signalée</Badge> : null}
+                  {note.isFlagged ? (
+                    <Badge className="bg-department text-department-foreground">Signalée</Badge>
+                  ) : null}
                   <span className="text-xs text-muted-foreground">
                     {note.authorName} · {format(note.createdAt, "dd/MM/yyyy HH:mm", { locale: fr })}
                   </span>

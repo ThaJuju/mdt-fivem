@@ -52,10 +52,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           __html: `document.documentElement.dataset.department=${JSON.stringify(departmentSlug)};`,
         }}
       />
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen min-w-0 flex-col">
         <TopBar unit={unitInfo} />
         <AppNav />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="page-shell">{children}</div>
+        </main>
       </div>
     </ActorProvider>
   );

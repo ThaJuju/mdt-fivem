@@ -51,9 +51,9 @@ export const CALL_SOURCE_LABELS: Record<string, string> = {
   OFFICER: "Agent",
 };
 
-/** Priorité 1 = urgence absolue. Le rouge est réservé à ce seul niveau. */
+/** Les priorités d'appel utilisent l'accent départemental, distinct du 10-99. */
 export function priorityClass(priority: number): string {
-  if (priority <= 1) return "border-alert text-alert";
+  if (priority <= 1) return "border-department bg-department/10 text-department";
   if (priority === 2) return "border-department text-department";
   return "border-border text-muted-foreground";
 }

@@ -46,7 +46,7 @@ export const columns: ColumnDef<VehicleRow>[] = [
     header: "Statut",
     cell: ({ row }) => (
       <div className="flex gap-1.5">
-        {row.original.isStolen ? <Badge className="bg-alert text-alert-foreground">Volé</Badge> : null}
+        {row.original.isStolen ? <Badge className="bg-department text-department-foreground">Volé</Badge> : null}
         {row.original.isImpounded ? <Badge variant="secondary">Fourrière</Badge> : null}
       </div>
     ),

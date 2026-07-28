@@ -59,14 +59,14 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
 
   return (
     <header
-      className="flex h-12 shrink-0 items-center justify-between border-b-2 px-4"
+      className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b-2 px-3 shadow-[0_8px_24px_rgb(0_0_0/0.28)] sm:px-5"
       style={{
         borderBottomColor: statusBorderColor(unit?.status),
         backgroundColor: isPanic ? "color-mix(in srgb, var(--alert) 12%, var(--card))" : "var(--card)",
       }}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="font-mono text-sm font-semibold tracking-wide text-department">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-7 items-center border border-department/45 bg-department/10 px-2 font-mono text-xs font-semibold tracking-[0.14em] text-department">
           {primary ? primary.departmentShortName : "MDT"}
         </span>
         {primary ? (
@@ -86,9 +86,15 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
         )}
 
         {unit ? (
-          <span className="flex items-center gap-2 border-l border-border pl-3 font-mono text-xs">
-            <span className="font-semibold">{unit.callsign}</span>
-            <span className={isPanic ? "font-semibold text-alert" : "text-muted-foreground"}>
+          <span className="flex h-7 items-center gap-2 border-l border-border pl-3 font-mono text-xs">
+            <span className="font-semibold tracking-wide text-foreground">{unit.callsign}</span>
+            <span
+              className={
+                isPanic
+                  ? "border border-alert/70 bg-alert/15 px-1.5 py-0.5 font-semibold text-alert"
+                  : "text-muted-foreground"
+              }
+            >
               {UNIT_STATUS_LABELS[unit.status] ?? unit.status}
             </span>
             {unit.callNumber ? (
@@ -101,12 +107,12 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
         ) : null}
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         <GlobalSearch />
-        <span className="hidden font-mono text-xs text-muted-foreground tabular-nums md:inline">
+        <span className="hidden border-l border-border pl-3 font-mono text-xs font-medium tracking-[0.08em] text-muted-foreground tabular-nums md:inline">
           {timeLabel}
         </span>
-        <span className="hidden text-sm sm:inline">
+        <span className="hidden text-xs font-medium text-foreground sm:inline">
           {actor.firstName} {actor.lastName}
         </span>
         <Button asChild variant="ghost" size="icon" title="Changer le mot de passe">

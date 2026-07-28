@@ -18,7 +18,7 @@ export function StolenToggle({ vehicleId, isStolen }: { vehicleId: string; isSto
         variant="outline"
         size="sm"
         disabled={isPending}
-        className={isStolen ? undefined : "border-alert bg-alert text-alert-foreground hover:bg-alert/90"}
+        className={isStolen ? undefined : "border-department bg-department text-department-foreground hover:brightness-110"}
       >
         {isStolen ? "Retirer le signalement de vol" : "Signaler comme volé"}
       </Button>

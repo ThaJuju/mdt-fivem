@@ -43,6 +43,6 @@ export const columns: ColumnDef<WeaponRow>[] = [
     id: "statut",
     header: "Statut",
     cell: ({ row }) =>
-      row.original.isStolen ? <Badge className="bg-alert text-alert-foreground">Volée</Badge> : null,
+      row.original.isStolen ? <Badge className="bg-department text-department-foreground">Volée</Badge> : null,
   },
 ];

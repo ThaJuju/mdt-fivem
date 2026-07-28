@@ -59,11 +59,11 @@ export function GlobalSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="flex h-8 items-center gap-2 rounded-md border border-border bg-background/70 px-2.5 text-xs text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:bg-accent hover:text-foreground"
       >
         <Search className="size-4" />
         <span className="hidden sm:inline">Rechercher…</span>
-        <kbd className="hidden rounded border border-border px-1 font-mono text-xs md:inline">Ctrl K</kbd>
+        <kbd className="hidden border-l border-border pl-2 font-mono text-[0.625rem] tracking-wide md:inline">Ctrl K</kbd>
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
@@ -86,7 +86,7 @@ export function GlobalSearch() {
               <CommandGroup heading={group.label}>
                 {group.results.map((result) => (
                   <CommandItem key={result.id} value={`${group.type}-${result.id}`} onSelect={() => go(result.href)}>
-                    {result.isAlert ? <AlertTriangle className="size-4 text-alert" /> : null}
+                    {result.isAlert ? <AlertTriangle className="size-4 text-department" /> : null}
                     <span className={group.type === "citizens" ? "" : "font-mono"}>{result.title}</span>
                     <span className="ml-auto text-xs text-muted-foreground">{result.subtitle}</span>
                   </CommandItem>

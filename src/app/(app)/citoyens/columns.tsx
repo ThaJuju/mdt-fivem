@@ -24,7 +24,7 @@ export const columns: ColumnDef<CitizenRow>[] = [
     cell: ({ row }) => (
       <Link href={`/citoyens/${row.original.id}`} className="flex items-center gap-2 hover:underline">
         {row.original.hasFlaggedNote ? (
-          <AlertTriangle className="size-4 text-alert" aria-label="Note signalée" />
+          <AlertTriangle className="size-4 text-department" aria-label="Note signalée" />
         ) : null}
         {row.original.lastName} {row.original.firstName}
       </Link>
