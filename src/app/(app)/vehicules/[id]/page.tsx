@@ -46,6 +46,14 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          {vehicle.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={vehicle.imageUrl}
+              alt={`Photo du véhicule ${vehicle.plate}`}
+              className="size-14 rounded-md border border-border object-cover"
+            />
+          ) : null}
           <h1 className="font-mono text-2xl font-semibold tracking-tight">{vehicle.plate}</h1>
           <span className="text-muted-foreground">
             {vehicle.make} {vehicle.model}

@@ -113,6 +113,14 @@ export default async function BolosPage({
                 ) : null}
               </div>
 
+              {bolo.imageUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={bolo.imageUrl}
+                  alt={bolo.title}
+                  className="max-h-44 w-full rounded-md border border-border object-cover"
+                />
+              ) : null}
               <h2 className="font-medium">{bolo.title}</h2>
               <p className="text-sm whitespace-pre-wrap text-muted-foreground">{bolo.description}</p>
 

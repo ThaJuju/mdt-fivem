@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CitizenPicker } from "@/components/citizen-picker";
+import { ImageField } from "@/components/image-field";
 import { createVehicle, updateVehicle, type FormState } from "./actions";
 
 const DOCUMENT_STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -135,8 +136,8 @@ export function VehicleForm({ vehicle }: { vehicle?: ExistingVehicle }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="imageUrl">Photo (URL)</Label>
-        <Input id="imageUrl" name="imageUrl" defaultValue={vehicle?.imageUrl ?? undefined} />
+        <Label>Photo</Label>
+        <ImageField name="imageUrl" defaultValue={vehicle?.imageUrl} label="Photo du véhicule" />
       </div>
 
       <div className="flex flex-col gap-2">

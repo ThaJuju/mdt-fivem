@@ -22,6 +22,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CitizenPicker } from "@/components/citizen-picker";
 import { AsyncPicker } from "@/components/async-picker";
+import { ImageField } from "@/components/image-field";
 import { searchVehiclesForReport } from "@/app/(app)/rapports/search";
 import { saveBolo, closeBolo, reopenBolo, deleteBolo, type FormState } from "./actions";
 
@@ -114,8 +115,8 @@ function BoloForm({ bolo, onSuccess }: { bolo?: ExistingBolo; onSuccess?: () => 
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="imageUrl">Image (URL, optionnel)</Label>
-        <Input id="imageUrl" name="imageUrl" defaultValue={bolo?.imageUrl ?? undefined} />
+        <Label>Image (optionnel)</Label>
+        <ImageField name="imageUrl" defaultValue={bolo?.imageUrl} label="Image du BOLO" />
       </div>
 
       <div className="flex flex-col gap-2">

@@ -80,6 +80,14 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
+          {citizen.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={citizen.imageUrl}
+              alt={`Photo de ${citizen.firstName} ${citizen.lastName}`}
+              className="size-14 rounded-md border border-border object-cover"
+            />
+          ) : null}
           <h1 className="text-2xl font-semibold tracking-tight">
             {citizen.firstName} {citizen.lastName}
           </h1>

@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ImageField } from "@/components/image-field";
 import { createCitizen, updateCitizen, type FormState } from "./actions";
 
 export type ExistingCitizen = {
@@ -132,8 +133,8 @@ export function CitizenForm({ citizen }: { citizen?: ExistingCitizen }) {
           ))}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="imageUrl">Photo (URL)</Label>
-          <Input id="imageUrl" name="imageUrl" defaultValue={citizen?.imageUrl ?? undefined} />
+          <Label>Photo</Label>
+          <ImageField name="imageUrl" defaultValue={citizen?.imageUrl} label="Photo du citoyen" />
         </div>
       </div>
 

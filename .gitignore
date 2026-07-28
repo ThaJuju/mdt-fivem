@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# fichiers envoyés par les agents (photos citoyens, véhicules, BOLO)
+/uploads
