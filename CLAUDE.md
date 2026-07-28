@@ -8,12 +8,18 @@ données indépendante du serveur de jeu, alimentée à la main.
 ## Commandes
 
 ```
-npm run dev              # serveur de dev
+npm run dev               # serveur maison (Next + Socket.io) — PORT/HOSTNAME surchargeables
+npm run dev:next          # Next seul, sans temps réel
 npm run build             # build de prod (lint + typecheck inclus)
+npm start                 # prod, via le même serveur maison
 npx prisma migrate dev    # nouvelle migration après modification du schéma
 npx prisma db seed        # rejoue le seed (idempotent, upserts)
 npx prisma studio         # explorateur de données
 ```
+
+Le dispatch temps réel exige `npm run dev` (ou `npm start`) : `dev:next`
+n'expose pas de WebSocket, `broadcastDispatchUpdate()` devient alors une
+fonction vide et l'application fonctionne sans synchronisation.
 
 `.env` doit définir `DATABASE_URL` et `ADMIN_PASSWORD`. Le seed échoue
 volontairement si `ADMIN_PASSWORD` est absent — ne jamais lui donner de valeur
@@ -113,7 +119,20 @@ Voir le brief original pour le détail des 9 phases (0 à 8).
 - **Phase 3** — code pénal (catégories + infractions) et rapports : éditeur,
   personnes impliquées, agents, véhicules, pièces jointes, charges à barème
   figé avec total automatique, workflow brouillon → soumis → validé/refusé.
-- **Phases 4 à 8** — à faire.
+- **Phase 4** — mandats (demande, approbation, exécution) et BOLO, avec
+  expiration paresseuse dans `lib/expiry.ts`.
+- **Phase 5** — dispatch temps réel : `server.ts` (Next + Socket.io),
+  `lib/realtime.ts`, barre de statut pilotée par le statut d'unité.
+- **Phase 6** — médical : dossiers, volet EMS 1-1 sur `Report`, aptitude au
+  port d'arme remontée sur la fiche civile.
+- **Phase 7** — RH : effectif, recrutement, grades, certifications,
+  sanctions, pointage, annonces (reprises sur le tableau de bord).
+- **Phase 8** — finition : pagination serveur complétée, squelettes de
+  chargement, focus clavier, cibles tactiles, états vides orientés action.
+
+Les 9 phases du brief sont livrées. Aucune vérification visuelle n'a pu être
+faite — l'outillage navigateur n'était pas disponible pendant la
+construction. Tout a été validé par requêtes HTTP réelles contre le serveur.
 
 ## Tester une server action en HTTP
 
