@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Pin } from "lucide-react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { requireActor, can } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = {
   title: "Tableau de bord — MDT",
@@ -11,6 +15,19 @@ export const metadata: Metadata = {
 export default async function DashboardPage() {
   const actor = await requireActor();
   const activeMemberships = actor.memberships.filter((m) => m.status === "ACTIVE");
+  const departmentIds = activeMemberships.map((m) => m.departmentId);
+
+  // Les annonces internes remontent ici : c'est la première page vue en
+  // prenant son service.
+  const announcements = await prisma.announcement.findMany({
+    where: { OR: [{ departmentId: null }, { departmentId: { in: departmentIds } }] },
+    orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+    take: 5,
+    include: {
+      author: { select: { firstName: true, lastName: true } },
+      department: { select: { shortName: true } },
+    },
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,6 +61,33 @@ export default async function DashboardPage() {
             </Card>
           ))}
         </div>
+      ) : null}
+
+      {announcements.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium">Annonces</h2>
+          <div className="flex flex-col gap-2">
+            {announcements.map((announcement) => (
+              <article
+                key={announcement.id}
+                className="flex flex-col gap-1 rounded-md border border-border bg-card p-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  {announcement.isPinned ? <Pin className="size-3.5 text-department" /> : null}
+                  <span className="font-medium">{announcement.title}</span>
+                  <Badge variant="secondary">
+                    {announcement.department?.shortName ?? "Tous services"}
+                  </Badge>
+                </div>
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground">{announcement.content}</p>
+                <span className="text-xs text-muted-foreground">
+                  {announcement.author.firstName} {announcement.author.lastName} ·{" "}
+                  {format(announcement.createdAt, "dd/MM/yyyy", { locale: fr })}
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {can(actor, "admin.panel") ? (
