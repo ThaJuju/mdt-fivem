@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiImageField } from "@/components/multi-image-field";
+import { useActor } from "@/components/actor-provider";
 import { readDraft, writeDraft, clearDraft } from "@/lib/draft-storage";
 import { REPORT_TYPE_LABELS } from "@/lib/labels";
 import { createReport, updateReport, type FormState } from "./actions";
@@ -53,6 +54,7 @@ export function ReportForm({
 }) {
   const action = report ? updateReport : createReport;
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const actor = useActor();
 
   // Le brouillon ne concerne que la rédaction : modifier un rapport existant
   // travaille déjà sur des données enregistrées.
@@ -91,6 +93,14 @@ export function ReportForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  // On montre l'affectation correspondant au service choisi : un agent qui
+  // appartient à deux services n'a pas le même matricule dans chacun.
+  const activePostings = actor.memberships.filter((m) => m.status === "ACTIVE");
+  const authorPosting =
+    activePostings.find((m) => m.departmentId === values.departmentId) ??
+    activePostings.find((m) => m.isPrimary) ??
+    activePostings[0];
+
   function set<K extends keyof DraftValues>(key: K, value: DraftValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
@@ -104,6 +114,30 @@ export function ReportForm({
       className="flex flex-col gap-4"
     >
       {report ? <input type="hidden" name="id" value={report.id} /> : null}
+
+      {isDrafting ? (
+        <div className="flex flex-col gap-2">
+          <Label>Rédigé par</Label>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+            <span className="font-medium">
+              {actor.firstName} {actor.lastName}
+            </span>
+            {authorPosting ? (
+              <span className="font-mono text-xs text-muted-foreground">
+                {authorPosting.departmentShortName} · {authorPosting.gradeName} · #
+                {authorPosting.badgeNumber}
+                {authorPosting.callsign ? ` · ${authorPosting.callsign}` : ""}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Aucune affectation active</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Vous serez enregistré comme agent principal du rapport. D&apos;autres agents peuvent y être
+            ajoutés une fois le rapport créé.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
