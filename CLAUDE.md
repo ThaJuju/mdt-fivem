@@ -21,6 +21,13 @@ Le dispatch temps réel exige `npm run dev` (ou `npm start`) : `dev:next`
 n'expose pas de WebSocket, `broadcastDispatchUpdate()` devient alors une
 fonction vide et l'application fonctionne sans synchronisation.
 
+**Pour utiliser l'application, lancer `npm start`, pas `npm run dev`.** En
+mode dev, Next compile chaque route à la première visite : la navigation
+donne l'impression d'une application très lente (plusieurs secondes par page
+découverte, ~350 ms ensuite). En production les mêmes pages répondent en
+50 à 150 ms. `npm run dev` ne sert qu'à développer, pour le rechargement à
+chaud.
+
 `.env` doit définir `DATABASE_URL` et `ADMIN_PASSWORD`. Le seed échoue
 volontairement si `ADMIN_PASSWORD` est absent — ne jamais lui donner de valeur
 par défaut dans le code.
