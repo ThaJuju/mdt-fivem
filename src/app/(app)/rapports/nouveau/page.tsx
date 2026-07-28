@@ -19,7 +19,7 @@ export default async function NouveauRapportPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Rédiger un rapport</h1>
 
       {departments.length === 0 ? (
@@ -28,7 +28,7 @@ export default async function NouveauRapportPage() {
           rapport.
         </p>
       ) : (
-        <Card className="max-w-3xl">
+        <Card>
           <CardHeader>
             <CardTitle>Informations</CardTitle>
           </CardHeader>

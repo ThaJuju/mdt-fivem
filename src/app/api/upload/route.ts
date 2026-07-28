@@ -32,6 +32,12 @@ const UPLOAD_PERMISSIONS = [
   "vehicles.create",
   "vehicles.edit",
   "bolos.manage",
+  // Pièces jointes des rapports : un agent qui peut rédiger ou corriger un
+  // rapport doit pouvoir y joindre une photo.
+  "reports.create",
+  "reports.edit",
+  "reports.edit_any",
+  "medical.reports.create",
 ];
 
 export async function POST(request: Request) {

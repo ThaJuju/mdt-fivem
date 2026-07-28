@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AsyncPicker } from "@/components/async-picker";
+import { ImageField } from "@/components/image-field";
 import { EVIDENCE_KIND_LABELS } from "@/lib/labels";
 import { searchVehiclesForReport } from "../search";
 import {
@@ -176,6 +177,9 @@ export function EvidenceSection({
   canEdit: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // La nature pilote le champ proposé : collage d'image pour une photo,
+  // simple lien pour une vidéo, un document ou un objet placé sous scellé.
+  const [kind, setKind] = useState("IMAGE");
   const [state, formAction, isPending] = useActionState(addEvidence, initialState);
 
   useEffect(() => {
@@ -212,7 +216,7 @@ export function EvidenceSection({
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Nature</Label>
-                  <Select name="kind" defaultValue="IMAGE">
+                  <Select name="kind" value={kind} onValueChange={setKind}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -225,10 +229,17 @@ export function EvidenceSection({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="url">Lien (optionnel)</Label>
-                  <Input id="url" name="url" placeholder="https://…" />
-                </div>
+                {kind === "IMAGE" ? (
+                  <div className="flex flex-col gap-2">
+                    <Label>Photo</Label>
+                    <ImageField name="url" label="Pièce jointe" />
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="url">Lien (optionnel)</Label>
+                    <Input id="url" name="url" placeholder="https://…" />
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="description">Description (optionnel)</Label>
                   <Textarea id="description" name="description" rows={2} />
@@ -270,6 +281,14 @@ export function EvidenceSection({
                 </div>
                 {item.description ? (
                   <p className="text-sm text-muted-foreground">{item.description}</p>
+                ) : null}
+                {item.kind === "IMAGE" && item.url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={item.url}
+                    alt={item.label}
+                    className="mt-1 max-h-56 rounded-md border border-border object-contain"
+                  />
                 ) : null}
               </div>
               {canEdit ? (
