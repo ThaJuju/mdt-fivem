@@ -1,3 +1,5 @@
+"use client";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Prisma } from "@prisma/client";
 import { format } from "date-fns";

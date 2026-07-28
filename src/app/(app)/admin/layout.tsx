@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { requireActor, can } from "@/lib/auth";
+import { requireActor, requirePagePermission, can } from "@/lib/auth";
 import { AdminTabs } from "@/components/admin-tabs";
 
 const ADMIN_SECTIONS = [
@@ -11,7 +10,7 @@ const ADMIN_SECTIONS = [
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireActor();
-  if (!can(actor, "admin.panel")) redirect("/");
+  requirePagePermission(actor, "admin.panel");
 
   const sections = ADMIN_SECTIONS.filter((section) => can(actor, section.permission)).map((section) => ({
     href: section.href,

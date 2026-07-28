@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogOut, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useActor } from "./actor-provider";
+import { GlobalSearch } from "./global-search";
 import { logout } from "@/app/actions";
 
 function useClock(): Date | null {
@@ -58,6 +59,7 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-3">
+        <GlobalSearch />
         <span className="hidden font-mono text-xs text-muted-foreground tabular-nums md:inline">
           {timeLabel}
         </span>

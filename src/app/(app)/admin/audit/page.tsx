@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parsePageParams, pageCount } from "@/lib/pagination";
-import { DataTable } from "@/components/data-table";
 import { AuditFilters } from "./audit-filters";
-import { columns, type AuditRow } from "./columns";
+import type { AuditRow } from "./columns";
+import { AuditTable } from "./audit-table";
 
 export const metadata: Metadata = { title: "Journal d'audit — Administration — MDT" };
 
@@ -15,7 +15,7 @@ export default async function AuditPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const actor = await requireActor();
-  assertCan(actor, "admin.audit.view");
+  requirePagePermission(actor, "admin.audit.view");
 
   const params = await searchParams;
   const { page, pageSize, skip, take } = parsePageParams(params, 50);
@@ -68,14 +68,7 @@ export default async function AuditPage({
   return (
     <div className="flex flex-col gap-4">
       <AuditFilters />
-      <DataTable
-        columns={columns}
-        data={rows}
-        page={page}
-        pageCount={pageCount(total, pageSize)}
-        total={total}
-        emptyState="Aucune entrée ne correspond à ces filtres."
-      />
+      <AuditTable data={rows} page={page} pageCount={pageCount(total, pageSize)} total={total} />
     </div>
   );
 }

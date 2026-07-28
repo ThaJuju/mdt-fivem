@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DepartmentForm } from "../department-form";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Détail du département — Administ
 
 export default async function DepartmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireActor();
-  assertCan(actor, "admin.departments.manage");
+  requirePagePermission(actor, "admin.departments.manage");
 
   const { id } = await params;
 

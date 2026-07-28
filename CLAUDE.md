@@ -51,6 +51,25 @@ Quand une infraction est ajoutée à un rapport, `fine`, `jailMinutes` et
 puis modifiables au cas par cas. Modifier le code pénal ensuite ne doit
 jamais réécrire les rapports déjà rédigés.
 
+## Pièges Server / Client à connaître
+
+**Les colonnes TanStack ne traversent pas la frontière.** Une `ColumnDef`
+contient des fonctions `cell`/`header` : les passer d'une page serveur à
+`<DataTable>` (client) lève « Functions cannot be passed directly to Client
+Components » — une erreur *runtime* que `next build` ne détecte pas. D'où le
+motif en place : chaque liste a son wrapper client (`citizens-table.tsx`,
+`users-table.tsx`…) qui importe ses colonnes de son côté ; la page serveur ne
+passe que des données sérialisables. Les `columns.tsx` sont marqués
+`"use client"`. Reproduire ce motif pour toute nouvelle liste.
+
+**`assertCan` dans une page produit un 500.** `assertCan` est la garde des
+*server actions* (elle lève une `ActionError`). Pour les *pages*, utiliser
+`requirePagePermission(actor, "…")` : redirige vers `/acces-refuse?p=…` qui
+nomme la permission manquante en français.
+
+Corollaire général : un `next build` vert ne prouve pas qu'une page s'affiche.
+Vérifier chaque route en HTTP réel avant de considérer une phase terminée.
+
 ## Direction visuelle
 
 Un seul thème (sombre), pas de bascule clair/sombre — c'est une console radio,
@@ -80,8 +99,15 @@ SHA-256 avant stockage).
 
 ## Plan de travail
 
-Voir le brief original pour le détail des 9 phases (0 à 8). Statut suivi via
-les tâches de la session — Phase 0 (fondations) posée : schéma Prisma complet,
-seed (3 départements/grades, 30 infractions en 5 catégories, 10-codes,
-super-admin), libs `prisma.ts` / `permissions.ts` / `auth.ts` / `audit.ts` /
-`errors.ts`, palette et polices en place.
+Voir le brief original pour le détail des 9 phases (0 à 8).
+
+- **Phase 0** — fondations : schéma Prisma complet, seed (3 départements et
+  leurs grades, 30 infractions en 5 catégories, 33 10-codes, super-admin),
+  libs `prisma.ts` / `permissions.ts` / `auth.ts` / `audit.ts` / `errors.ts`,
+  palette et polices.
+- **Phase 1** — auth (sessions maison, mot de passe forcé, middleware) et
+  panel admin (comptes, départements/grades, 10-codes, journal d'audit).
+  Primitives : `DataTable`, `SearchBox`, `pagination.ts`.
+- **Phase 2** — fichiers : citoyens (notes signalées en bandeau, licences),
+  véhicules, armes, recherche globale unifiée (`Ctrl/⌘ K`).
+- **Phases 3 à 8** — à faire.

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateStatusCodeDialog, EditStatusCodeDialog } from "./status-code-dialogs";
@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "10-codes — Administration — MDT"
 
 export default async function CodesPage() {
   const actor = await requireActor();
-  assertCan(actor, "admin.codes.manage");
+  requirePagePermission(actor, "admin.codes.manage");
 
   const statusCodes = await prisma.statusCode.findMany({ orderBy: { order: "asc" } });
 

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parsePageParams, pageCount } from "@/lib/pagination";
-import { DataTable } from "@/components/data-table";
 import { SearchBox } from "@/components/search-box";
-import { columns, type UserRow } from "./columns";
+import type { UserRow } from "./columns";
+import { UsersTable } from "./users-table";
 import { CreateUserDialog } from "./create-user-dialog";
 
 export const metadata: Metadata = { title: "Comptes — Administration — MDT" };
@@ -16,7 +16,7 @@ export default async function ComptesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const actor = await requireActor();
-  assertCan(actor, "admin.users.manage");
+  requirePagePermission(actor, "admin.users.manage");
 
   const params = await searchParams;
   const { page, pageSize, skip, take } = parsePageParams(params, 25);
@@ -75,14 +75,7 @@ export default async function ComptesPage({
         <SearchBox placeholder="Rechercher un compte…" />
         <CreateUserDialog />
       </div>
-      <DataTable
-        columns={columns}
-        data={rows}
-        page={page}
-        pageCount={pageCount(total, pageSize)}
-        total={total}
-        emptyState="Aucun compte ne correspond à cette recherche."
-      />
+      <UsersTable data={rows} page={page} pageCount={pageCount(total, pageSize)} total={total} />
     </div>
   );
 }

@@ -212,3 +212,15 @@ export function assertCan(actor: Actor | null, permission: string): asserts acto
     throw new ActionError("Vous n'avez pas la permission nécessaire pour effectuer cette action.");
   }
 }
+
+/**
+ * Équivalent de `assertCan` pour les *pages* : au lieu de lever une erreur
+ * (qui produirait un 500 illisible), redirige vers une page d'accès refusé
+ * qui explique quelle permission manque. `assertCan` reste la garde des
+ * server actions.
+ */
+export function requirePagePermission(actor: Actor, permission: string): void {
+  if (!can(actor, permission)) {
+    redirect(`/acces-refuse?p=${encodeURIComponent(permission)}`);
+  }
+}

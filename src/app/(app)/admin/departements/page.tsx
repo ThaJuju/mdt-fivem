@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, requirePagePermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { CreateDepartmentDialog } from "./create-department-dialog";
@@ -16,7 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default async function DepartementsPage() {
   const actor = await requireActor();
-  assertCan(actor, "admin.departments.manage");
+  requirePagePermission(actor, "admin.departments.manage");
 
   const departments = await prisma.department.findMany({
     orderBy: { order: "asc" },
