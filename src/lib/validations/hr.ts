@@ -11,6 +11,26 @@ const optionalInt = z
   .optional()
   .transform((value) => (value === "" || value === undefined ? undefined : value));
 
+/** Recrutement d'un compte qui n'existe pas encore : compte + affectation. */
+export const hireNewSchema = z.object({
+  username: z
+    .string()
+    .min(3, "3 caractères minimum.")
+    .max(32, "32 caractères maximum.")
+    .regex(/^[a-z0-9._-]+$/, "Minuscules, chiffres, points et tirets uniquement."),
+  firstName: z.string().min(1, "Prénom requis."),
+  lastName: z.string().min(1, "Nom requis."),
+  departmentId: z.string().min(1, "Département requis."),
+  gradeId: z.string().min(1, "Grade requis."),
+  badgeNumber: z.string().min(1, "Matricule requis."),
+  callsign: optionalText,
+});
+export type HireNewInput = z.infer<typeof hireNewSchema>;
+
+export const removeFromDepartmentSchema = z.object({
+  membershipId: z.string().min(1),
+});
+
 export const hireSchema = z.object({
   userId: z.string().min(1, "Agent requis."),
   departmentId: z.string().min(1, "Département requis."),

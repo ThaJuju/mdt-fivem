@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Loader2, UserPlus, ArrowUpDown, UserMinus, Gavel } from "lucide-react";
+import { Loader2, UserPlus, ArrowUpDown, UserMinus, Gavel, Trash2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -25,7 +25,15 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AsyncPicker } from "@/components/async-picker";
 import { searchHireCandidates } from "./search";
-import { hireAgent, promoteAgent, terminateAgent, addDiscipline, type FormState } from "./actions";
+import {
+  hireAgent,
+  hireNewAgent,
+  removeFromDepartment,
+  promoteAgent,
+  terminateAgent,
+  addDiscipline,
+  type FormState,
+} from "./actions";
 
 const initialState: FormState = {};
 
@@ -68,6 +76,206 @@ const STATUS_LABELS: Record<string, string> = {
   TERMINATED: "Parti",
 };
 
+
+/** Recrutement d'une personne sans compte : création du compte et affectation. */
+function HireNewDialog({ departments }: { departments: DepartmentOption[] }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, isPending] = useActionState(hireNewAgent, initialState);
+  const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+  }, [state]);
+
+  const grades = [...(departments.find((d) => d.id === departmentId)?.grades ?? [])].sort(
+    (a, b) => a.level - b.level,
+  );
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setCopied(false);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlus className="size-4" />
+          Recruter
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Recruter dans votre service</DialogTitle>
+        </DialogHeader>
+
+        {state.createdPassword ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              Compte <span className="font-mono">{state.createdUsername}</span> créé. Transmettez ce mot
+              de passe provisoire à l&apos;agent : il ne sera plus affiché, et devra être changé à sa
+              première connexion.
+            </p>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+              <code className="flex-1 font-mono text-sm">{state.createdPassword}</code>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(state.createdPassword ?? "");
+                  setCopied(true);
+                }}
+              >
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                {copied ? "Copié" : "Copier"}
+              </Button>
+            </div>
+            <Button type="button" onClick={() => setOpen(false)} className="w-fit">
+              Terminé
+            </Button>
+          </div>
+        ) : (
+          <form action={formAction} className="flex flex-col gap-4">
+            <input type="hidden" name="departmentId" value={departmentId} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-firstName">Prénom</Label>
+                <Input id="new-firstName" name="firstName" autoFocus />
+                {state.fieldErrors?.firstName?.map((m) => (
+                  <p key={m} className="text-sm text-destructive">
+                    {m}
+                  </p>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-lastName">Nom</Label>
+                <Input id="new-lastName" name="lastName" />
+                {state.fieldErrors?.lastName?.map((m) => (
+                  <p key={m} className="text-sm text-destructive">
+                    {m}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="new-username">Identifiant de connexion</Label>
+              <Input id="new-username" name="username" className="font-mono" placeholder="m.dubois" />
+              {state.fieldErrors?.username?.map((m) => (
+                <p key={m} className="text-sm text-destructive">
+                  {m}
+                </p>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <Label>Service</Label>
+                <Select value={departmentId} onValueChange={setDepartmentId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.shortName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Grade</Label>
+                <Select name="gradeId" defaultValue={grades.find((g) => g.level === 1)?.id}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grades.map((grade) => (
+                      <SelectItem key={grade.id} value={grade.id}>
+                        {grade.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-badge">Matricule</Label>
+                <Input id="new-badge" name="badgeNumber" className="font-mono" />
+                {state.fieldErrors?.badgeNumber?.map((m) => (
+                  <p key={m} className="text-sm text-destructive">
+                    {m}
+                  </p>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-callsign">Indicatif</Label>
+                <Input id="new-callsign" name="callsign" className="font-mono" />
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Un mot de passe provisoire sera généré et affiché une seule fois.
+            </p>
+
+            <Button type="submit" disabled={isPending} className="w-fit">
+              {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Créer le compte et recruter
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Retire définitivement l'agent du service (le compte et son historique restent). */
+function RemoveFromDepartmentButton({ row }: { row: RosterRow }) {
+  const [state, formAction] = useActionState(removeFromDepartment, initialState);
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+  }, [state]);
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="ghost" title="Retirer du service">
+          <Trash2 className="size-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Retirer {row.name} du service ?</AlertDialogTitle>
+          <AlertDialogDescription>
+            L&apos;agent disparaît de l&apos;effectif et perd ses accès immédiatement. Son compte et ses
+            rapports sont conservés — ils doivent rester attribuables. S&apos;il n&apos;appartient à
+            aucun autre service, son compte est désactivé.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <form action={formAction}>
+            <input type="hidden" name="membershipId" value={row.membershipId} />
+            <AlertDialogAction
+              type="submit"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Retirer
+            </AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function HireDialog({ departments }: { departments: DepartmentOption[] }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(hireAgent, initialState);
@@ -83,14 +291,14 @@ function HireDialog({ departments }: { departments: DepartmentOption[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button variant="outline">
           <UserPlus className="size-4" />
-          Recruter
+          Compte existant
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Recruter un agent</DialogTitle>
+          <DialogTitle>Affecter un compte existant</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="departmentId" value={departmentId} />
@@ -333,7 +541,12 @@ export function RosterSection({
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-medium">Effectif</h2>
-        {canHire && departments.length > 0 ? <HireDialog departments={departments} /> : null}
+        {canHire && departments.length > 0 ? (
+          <div className="flex gap-2">
+            <HireNewDialog departments={departments} />
+            <HireDialog departments={departments} />
+          </div>
+        ) : null}
       </div>
 
       {roster.length === 0 ? (
@@ -391,6 +604,7 @@ export function RosterSection({
                       {canPromote ? <PromoteDialog row={row} departments={departments} /> : null}
                       {canDiscipline ? <DisciplineDialog row={row} /> : null}
                       {canTerminate && row.status !== "TERMINATED" ? <TerminateButton row={row} /> : null}
+                      {canTerminate ? <RemoveFromDepartmentButton row={row} /> : null}
                     </div>
                   </td>
                 </tr>
