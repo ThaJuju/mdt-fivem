@@ -9,12 +9,13 @@ import { login, type LoginState } from "./actions";
 
 const initialState: LoginState = {};
 
-export function LoginForm() {
+export function LoginForm({ depuis }: { depuis?: string }) {
   const [state, formAction, isPending] = useActionState(login, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
+      {depuis ? <input type="hidden" name="depuis" value={depuis} /> : null}
       <div className="flex flex-col gap-2">
         <Label htmlFor="username">Identifiant</Label>
         <Input

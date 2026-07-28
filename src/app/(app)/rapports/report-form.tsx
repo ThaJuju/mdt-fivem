@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiImageField } from "@/components/multi-image-field";
+import { readDraft, writeDraft, clearDraft } from "@/lib/draft-storage";
 import { REPORT_TYPE_LABELS } from "@/lib/labels";
 import { createReport, updateReport, type FormState } from "./actions";
 
@@ -22,6 +23,18 @@ export type ExistingReport = {
 };
 
 const initialState: FormState = {};
+
+const DRAFT_KEY = "rapport-nouveau";
+
+type DraftValues = {
+  type: string;
+  title: string;
+  content: string;
+  location: string;
+  occurredAt: string;
+  departmentId: string;
+  photos: string[];
+};
 
 export function ReportForm({
   departments,
@@ -41,14 +54,61 @@ export function ReportForm({
   const action = report ? updateReport : createReport;
   const [state, formAction, isPending] = useActionState(action, initialState);
 
+  // Le brouillon ne concerne que la rédaction : modifier un rapport existant
+  // travaille déjà sur des données enregistrées.
+  const isDrafting = !report;
+  const [values, setValues] = useState<DraftValues>({
+    type: report?.type ?? "INCIDENT",
+    title: report?.title ?? "",
+    content: report?.content ?? "",
+    location: report?.location ?? "",
+    occurredAt: report?.occurredAt ?? "",
+    departmentId: report?.departmentId ?? departments[0]?.id ?? "",
+    photos: [],
+  });
+  const [restored, setRestored] = useState(!isDrafting);
+
+  // Restauration au montage, avant toute saisie.
+  useEffect(() => {
+    if (!isDrafting) return;
+    const draft = readDraft<DraftValues>(DRAFT_KEY);
+    if (draft) setValues((current) => ({ ...current, ...draft }));
+    setRestored(true);
+  }, [isDrafting]);
+
+  // Sauvegarde à chaque changement, une fois la restauration faite (sinon on
+  // écraserait le brouillon avec les valeurs par défaut au premier rendu).
+  useEffect(() => {
+    if (!isDrafting || !restored) return;
+    writeDraft(DRAFT_KEY, values);
+  }, [isDrafting, restored, values]);
+
+  // Une erreur de validation renvoie le formulaire : le brouillon effacé à la
+  // soumission doit être réécrit, sinon la saisie serait perdue en quittant.
+  useEffect(() => {
+    if (!isDrafting) return;
+    if (state.error || state.fieldErrors) writeDraft(DRAFT_KEY, values);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  function set<K extends keyof DraftValues>(key: K, value: DraftValues[K]) {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form
+      action={formAction}
+      onSubmit={() => {
+        if (isDrafting) clearDraft(DRAFT_KEY);
+      }}
+      className="flex flex-col gap-4"
+    >
       {report ? <input type="hidden" name="id" value={report.id} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label>Type de rapport</Label>
-          <Select name="type" defaultValue={report?.type ?? "INCIDENT"} disabled={readOnly}>
+          <Select name="type" value={values.type} onValueChange={(v) => set("type", v)} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -65,7 +125,8 @@ export function ReportForm({
           <Label>Service</Label>
           <Select
             name="departmentId"
-            defaultValue={report?.departmentId ?? departments[0]?.id}
+            value={values.departmentId}
+            onValueChange={(v) => set("departmentId", v)}
             disabled={readOnly}
           >
             <SelectTrigger>
@@ -89,7 +150,7 @@ export function ReportForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="title">Titre</Label>
-        <Input id="title" name="title" defaultValue={report?.title} readOnly={readOnly} />
+        <Input id="title" name="title" value={values.title} onChange={(e) => set("title", e.target.value)} readOnly={readOnly} />
         {state.fieldErrors?.title?.map((m) => (
           <p key={m} className="text-sm text-destructive">
             {m}
@@ -104,7 +165,8 @@ export function ReportForm({
             id="occurredAt"
             name="occurredAt"
             type="datetime-local"
-            defaultValue={report?.occurredAt}
+            value={values.occurredAt}
+            onChange={(e) => set("occurredAt", e.target.value)}
             readOnly={readOnly}
           />
           {state.fieldErrors?.occurredAt?.map((m) => (
@@ -115,7 +177,7 @@ export function ReportForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="location">Lieu</Label>
-          <Input id="location" name="location" defaultValue={report?.location ?? undefined} readOnly={readOnly} />
+          <Input id="location" name="location" value={values.location} onChange={(e) => set("location", e.target.value)} readOnly={readOnly} />
         </div>
       </div>
 
@@ -124,7 +186,8 @@ export function ReportForm({
         <Textarea
           id="content"
           name="content"
-          defaultValue={report?.content}
+          value={values.content}
+          onChange={(e) => set("content", e.target.value)}
           rows={12}
           readOnly={readOnly}
           placeholder="Décrivez les faits, dans l'ordre chronologique."
@@ -139,7 +202,7 @@ export function ReportForm({
       {allowPhotos && !readOnly ? (
         <div className="flex flex-col gap-2">
           <Label>Photos (optionnel)</Label>
-          <MultiImageField name="evidenceUrls" />
+          <MultiImageField name="evidenceUrls" value={values.photos} onChange={(p) => set("photos", p)} />
           <p className="text-xs text-muted-foreground">
             Elles seront jointes au rapport. Vous pourrez les nommer et en ajouter d&apos;autres une fois
             le rapport créé.

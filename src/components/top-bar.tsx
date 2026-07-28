@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useActor } from "./actor-provider";
 import { GlobalSearch } from "./global-search";
 import { logout } from "@/app/actions";
+import { clearAllDrafts } from "@/lib/draft-storage";
 
 function useClock(): Date | null {
   const [now, setNow] = useState<Date | null>(null);
@@ -120,7 +121,9 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
             <KeyRound className="size-4" />
           </Link>
         </Button>
-        <form action={logout}>
+        {/* Les brouillons restent dans le navigateur : on les efface en partant,
+            pour ne rien laisser au collègue suivant sur un poste partagé. */}
+        <form action={logout} onSubmit={() => clearAllDrafts()}>
           <Button type="submit" variant="ghost" size="icon" title="Se déconnecter">
             <LogOut className="size-4" />
           </Button>

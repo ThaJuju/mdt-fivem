@@ -11,6 +11,22 @@ export type LoginState = {
   fieldErrors?: Partial<Record<"username" | "password", string[]>>;
 };
 
+/**
+ * Le middleware pose `?depuis=<chemin>` quand il intercepte une page demandée
+ * sans session. On y renvoie l'agent après connexion, plutôt que de le lâcher
+ * sur le tableau de bord alors qu'il visait une fiche précise.
+ *
+ * Seuls les chemins internes sont acceptés : un `//evil.example` ou une URL
+ * absolue serait une redirection ouverte, qui permettrait d'envoyer quelqu'un
+ * sur un faux MDT juste après sa connexion.
+ */
+function safeReturnPath(raw: FormDataEntryValue | null): string | null {
+  if (typeof raw !== "string") return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  if (raw.startsWith("/connexion")) return null;
+  return raw;
+}
+
 export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse({
     username: formData.get("username"),
@@ -33,6 +49,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   await createSession(user.id);
   await audit({ id: user.id }, "auth.login");
 
-  const destination = user.mustChangePassword ? "/changer-mot-de-passe" : "/";
+  const destination = user.mustChangePassword
+    ? "/changer-mot-de-passe"
+    : (safeReturnPath(formData.get("depuis")) ?? "/");
   redirect(destination);
 }

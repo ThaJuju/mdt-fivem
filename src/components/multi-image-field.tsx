@@ -17,8 +17,23 @@ import { cn } from "@/lib/utils";
  * rédaction, alors que les pièces jointes ont besoin d'un rapport existant
  * pour être rattachées en base.
  */
-export function MultiImageField({ name }: { name: string }) {
-  const [urls, setUrls] = useState<string[]>([]);
+export function MultiImageField({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  /** Optionnel : rend le champ contrôlé, pour restaurer un brouillon. */
+  value?: string[];
+  onChange?: (urls: string[]) => void;
+}) {
+  const [internal, setInternal] = useState<string[]>([]);
+  const urls = value ?? internal;
+  const setUrls = (update: (previous: string[]) => string[]) => {
+    const next = update(urls);
+    if (onChange) onChange(next);
+    else setInternal(next);
+  };
   const [pending, setPending] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -65,6 +80,11 @@ export function MultiImageField({ name }: { name: string }) {
     }
   }
 
+  // L'écouteur de collage est posé une seule fois ; cette référence lui donne
+  // accès à la dernière version d'`uploadAll` sans le réabonner à chaque rendu.
+  const uploadAllRef = useRef(uploadAll);
+  uploadAllRef.current = uploadAll;
+
   // Collage global : on colle après une capture, sans cliquer dans la zone.
   useEffect(() => {
     function onDocumentPaste(event: globalThis.ClipboardEvent) {
@@ -77,7 +97,7 @@ export function MultiImageField({ name }: { name: string }) {
       const files = Array.from(event.clipboardData?.files ?? []);
       if (!files.some((file) => file.type.startsWith("image/"))) return;
       event.preventDefault();
-      void uploadAll(files);
+      void uploadAllRef.current(files);
     }
 
     document.addEventListener("paste", onDocumentPaste);

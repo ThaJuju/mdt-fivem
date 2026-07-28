@@ -7,7 +7,13 @@ export const metadata: Metadata = {
   title: "Connexion — MDT",
 };
 
-export default async function ConnexionPage() {
+export default async function ConnexionPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const depuis = typeof params.depuis === "string" ? params.depuis : undefined;
   const actor = await getActor();
   if (actor) {
     redirect(actor.mustChangePassword ? "/changer-mot-de-passe" : "/");
@@ -23,7 +29,7 @@ export default async function ConnexionPage() {
           <h1 className="text-2xl font-semibold tracking-tight">MDT</h1>
           <p className="text-sm text-muted-foreground">Connectez-vous avec votre identifiant.</p>
         </div>
-        <LoginForm />
+        <LoginForm depuis={depuis} />
       </div>
     </div>
   );
