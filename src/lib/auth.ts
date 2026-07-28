@@ -77,6 +77,28 @@ async function clientInfo() {
   };
 }
 
+/**
+ * Le cookie n'est marqué `Secure` que si la requête arrive réellement en
+ * HTTPS. Se fier à `NODE_ENV === "production"` était un piège : en production
+ * derrière du HTTP simple (LAN, IP directe), le navigateur refuse de stocker
+ * un cookie `Secure` et l'utilisateur semble déconnecté à chaque clic.
+ *
+ * La détection se fait via `x-forwarded-proto`, posé par un reverse proxy qui
+ * termine le TLS. Sans proxy, l'en-tête est absent et le cookie reste
+ * utilisable en clair ; le jour où l'application passe derrière nginx en
+ * HTTPS, il redevient `Secure` sans rien changer ici.
+ *
+ * `SESSION_COOKIE_SECURE=true` dans `.env` force le comportement si besoin.
+ */
+async function shouldUseSecureCookie(): Promise<boolean> {
+  const forced = process.env.SESSION_COOKIE_SECURE;
+  if (forced === "true") return true;
+  if (forced === "false") return false;
+
+  const headerList = await headers();
+  return headerList.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https";
+}
+
 /** Crée une session, pose le cookie httpOnly et met à jour la date de dernière connexion. */
 export async function createSession(userId: string): Promise<void> {
   const token = generateToken();
@@ -97,7 +119,7 @@ export async function createSession(userId: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: await shouldUseSecureCookie(),
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
