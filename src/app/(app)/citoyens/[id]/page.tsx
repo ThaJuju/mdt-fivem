@@ -29,6 +29,7 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
       licenses: { orderBy: { issuedAt: "desc" } },
       ownedVehicles: { orderBy: { plate: "asc" } },
       ownedWeapons: { orderBy: { serialNumber: "asc" } },
+      warrants: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -38,8 +39,27 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
 
   const flaggedNotes = citizen.notes.filter((note) => note.isFlagged);
 
+  const activeWarrants = can(actor, "warrants.view") ? citizen.warrants : [];
+
   return (
     <div className="flex flex-col gap-6">
+      {activeWarrants.length > 0 ? (
+        <div className="flex flex-col gap-2 rounded-md border border-alert bg-alert/10 p-4">
+          <div className="flex items-center gap-2 text-alert">
+            <AlertTriangle className="size-4" />
+            <span className="font-medium">
+              {activeWarrants.length} mandat{activeWarrants.length > 1 ? "s" : ""} actif
+              {activeWarrants.length > 1 ? "s" : ""}
+            </span>
+          </div>
+          {activeWarrants.map((warrant) => (
+            <p key={warrant.id} className="text-sm">
+              {warrant.type === "ARREST" ? "Mandat d'arrêt" : "Perquisition"} — {warrant.reason}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {flaggedNotes.length > 0 ? (
         <div className="flex flex-col gap-2 rounded-md border border-alert bg-alert/10 p-4">
           <div className="flex items-center gap-2 text-alert">

@@ -1,5 +1,15 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, ShieldCheck, Users, Car, Crosshair, FileText, Scale } from "lucide-react";
+import {
+  LayoutDashboard,
+  ShieldCheck,
+  Users,
+  Car,
+  Crosshair,
+  FileText,
+  Scale,
+  Gavel,
+  Megaphone,
+} from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -20,5 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/armes", label: "Armes", icon: Crosshair, permission: "weapons.view" },
   { href: "/rapports", label: "Rapports", icon: FileText, permission: "reports.view" },
   { href: "/code-penal", label: "Code pénal", icon: Scale, permission: "penalcode.view" },
+  { href: "/mandats", label: "Mandats", icon: Gavel, permission: "warrants.view" },
+  { href: "/bolos", label: "BOLO", icon: Megaphone, permission: "bolos.view" },
   { href: "/admin", label: "Administration", icon: ShieldCheck, permission: "admin.panel" },
 ];
