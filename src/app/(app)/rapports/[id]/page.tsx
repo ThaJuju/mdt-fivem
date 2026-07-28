@@ -13,6 +13,7 @@ import { ReportForm } from "../report-form";
 import { InvolvementsSection, OfficersSection } from "./people-section";
 import { ReportVehiclesSection, EvidenceSection } from "./attachments-section";
 import { ChargesSection } from "./charges-section";
+import { EmsSection } from "./ems-section";
 import { WorkflowBar } from "./workflow-bar";
 
 export const metadata: Metadata = { title: "Rapport — MDT" };
@@ -60,6 +61,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           offense: { select: { code: true, name: true } },
         },
       },
+      emsDetail: true,
     },
   });
 
@@ -250,6 +252,32 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           label: `${involvement.citizen.lastName} ${involvement.citizen.firstName}`,
         }))}
       />
+
+      {report.type === "EMS_INTERVENTION" || report.emsDetail ? (
+        <EmsSection
+          reportId={report.id}
+          canEdit={canEdit && can(actor, "medical.reports.create")}
+          detail={
+            report.emsDetail
+              ? {
+                  triage: report.emsDetail.triage,
+                  chiefComplaint: report.emsDetail.chiefComplaint,
+                  injuries: report.emsDetail.injuries,
+                  treatment: report.emsDetail.treatment,
+                  medications: report.emsDetail.medications,
+                  outcome: report.emsDetail.outcome,
+                  hospital: report.emsDetail.hospital,
+                  arrivedAt: report.emsDetail.arrivedAt
+                    ? toDateTimeLocal(report.emsDetail.arrivedAt)
+                    : null,
+                  clearedAt: report.emsDetail.clearedAt
+                    ? toDateTimeLocal(report.emsDetail.clearedAt)
+                    : null,
+                }
+              : null
+          }
+        />
+      ) : null}
 
       <ReportVehiclesSection
         reportId={report.id}

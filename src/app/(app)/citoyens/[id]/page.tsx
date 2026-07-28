@@ -30,6 +30,7 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
       ownedVehicles: { orderBy: { plate: "asc" } },
       ownedWeapons: { orderBy: { serialNumber: "asc" } },
       warrants: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" } },
+      medicalRecord: { select: { isFitForDuty: true } },
     },
   });
 
@@ -84,6 +85,14 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
           </h1>
           <span className="text-muted-foreground">{differenceInYears(new Date(), citizen.dob)} ans</span>
           {citizen.isDeceased ? <Badge variant="outline">Décédé</Badge> : null}
+          {/* L'aptitude conditionne le permis de port d'arme : utile côté police. */}
+          {citizen.medicalRecord?.isFitForDuty === false ? (
+            <Badge className="bg-destructive text-destructive-foreground">
+              Inapte au port d&apos;arme
+            </Badge>
+          ) : citizen.medicalRecord?.isFitForDuty === true ? (
+            <Badge variant="outline">Apte au port d&apos;arme</Badge>
+          ) : null}
         </div>
         {can(actor, "citizens.edit") ? (
           <DeceasedToggle citizenId={citizen.id} isDeceased={citizen.isDeceased} />

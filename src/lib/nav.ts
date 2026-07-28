@@ -10,6 +10,7 @@ import {
   Gavel,
   Megaphone,
   RadioTower,
+  HeartPulse,
 } from "lucide-react";
 
 export type NavItem = {
@@ -34,5 +35,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/dispatch", label: "Dispatch", icon: RadioTower, permission: "dispatch.view" },
   { href: "/mandats", label: "Mandats", icon: Gavel, permission: "warrants.view" },
   { href: "/bolos", label: "BOLO", icon: Megaphone, permission: "bolos.view" },
+  { href: "/medical", label: "Médical", icon: HeartPulse, permission: "medical.view" },
   { href: "/admin", label: "Administration", icon: ShieldCheck, permission: "admin.panel" },
 ];
