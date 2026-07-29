@@ -22,6 +22,7 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # debug
@@ -29,8 +30,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # env files (can opt-in for committing if needed)
+# Le dépôt est public : .env contient DATABASE_URL et ADMIN_PASSWORD, il ne
+# doit JAMAIS y entrer. Seul .env.example est suivi, avec des valeurs vides.
 .env*
 !.env.example
 
@@ -41,5 +45,31 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# fichiers envoyés par les agents (photos citoyens, véhicules, BOLO)
+# ─────────────────────────────────────────────────────────────────────────
+# Propre à ce projet
+# ─────────────────────────────────────────────────────────────────────────
+
+# Fichiers envoyés par les agents (photos citoyens, véhicules, BOLO, pièces
+# jointes médicales). Contenu de dossiers réels, y compris du secret médical :
+# n'a rien à faire dans un dépôt.
 /uploads
+
+# Configuration nginx réelle, dérivée du modèle : elle porte le nom de domaine
+# et les chemins de certificats de l'installation. Le modèle, lui, est suivi.
+/deploy/*.conf
+!/deploy/*.conf.example
+
+# Sauvegardes et exports de base.
+# Attention : ne PAS ignorer *.sql — les migrations Prisma
+# (prisma/migrations/**/migration.sql) doivent être commitées.
+/backups/
+*.dump
+*.sql.gz
+pg_dump*
+
+# Réglages locaux de Claude Code (propres à une machine). Les skills partagés
+# du projet, eux, restent suivis.
+.claude/settings.local.json
+
+# Scripts jetables écrits à la racine pendant un test ou un diagnostic.
+/_*.tmp.ts
