@@ -203,9 +203,40 @@ export async function updateMembership(_prevState: FormState, formData: FormData
     });
     if (!parsed.success || !parsed.data.id) return { fieldErrors: parsed.error?.flatten().fieldErrors ?? {} };
 
+    const current = await prisma.membership.findUnique({ where: { id: parsed.data.id } });
+    if (!current) return { error: "Cette affectation n'existe plus." };
+
     const grade = await prisma.grade.findUnique({ where: { id: parsed.data.gradeId } });
     if (!grade || grade.departmentId !== parsed.data.departmentId) {
-      return { error: "Ce grade n'appartient pas au département sélectionné." };
+      return { error: "Ce grade n'appartient pas au service sélectionné." };
+    }
+
+    // Mutation d'un service à un autre : l'agent ne peut pas figurer deux fois
+    // dans le même service, et le matricule doit être libre à l'arrivée.
+    const isTransfer = current.departmentId !== parsed.data.departmentId;
+    if (isTransfer) {
+      const alreadyThere = await prisma.membership.findFirst({
+        where: {
+          userId: parsed.data.userId,
+          departmentId: parsed.data.departmentId,
+          NOT: { id: parsed.data.id },
+        },
+      });
+      if (alreadyThere) {
+        return { error: "Cet agent a déjà une affectation dans ce service." };
+      }
+    }
+
+    const badgeHolder = await prisma.membership.findUnique({
+      where: {
+        departmentId_badgeNumber: {
+          departmentId: parsed.data.departmentId,
+          badgeNumber: parsed.data.badgeNumber,
+        },
+      },
+    });
+    if (badgeHolder && badgeHolder.id !== parsed.data.id) {
+      return { fieldErrors: { badgeNumber: ["Ce matricule est déjà attribué dans ce service."] } };
     }
 
     await prisma.$transaction(async (tx) => {
@@ -215,6 +246,10 @@ export async function updateMembership(_prevState: FormState, formData: FormData
       await tx.membership.update({
         where: { id: parsed.data.id },
         data: {
+          // Le service fait partie de ce qu'on peut modifier : sans cela, un
+          // changement de service laissait l'affectation avec un grade
+          // appartenant à un autre service.
+          departmentId: parsed.data.departmentId,
           gradeId: parsed.data.gradeId,
           badgeNumber: parsed.data.badgeNumber,
           callsign: parsed.data.callsign,
@@ -225,7 +260,13 @@ export async function updateMembership(_prevState: FormState, formData: FormData
       });
     });
 
-    await audit(actor, "membership.update", { entity: "Membership", entityId: parsed.data.id });
+    await audit(actor, isTransfer ? "membership.transfer" : "membership.update", {
+      entity: "Membership",
+      entityId: parsed.data.id,
+      metadata: isTransfer
+        ? { from: current.departmentId, to: parsed.data.departmentId, grade: grade.name }
+        : { grade: grade.name },
+    });
     revalidatePath(`/admin/comptes/${parsed.data.userId}`);
     return {};
   } catch (err) {

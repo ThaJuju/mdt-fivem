@@ -49,6 +49,19 @@ export function MembershipForm({
   const action = membership ? updateMembership : addMembership;
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [departmentId, setDepartmentId] = useState(membership?.departmentId ?? departments[0]?.id ?? "");
+  const [gradeId, setGradeId] = useState(membership?.gradeId ?? "");
+
+  /**
+   * Changer de service invalide le grade choisi : les grades appartiennent à
+   * un service. On repositionne sur le grade le plus bas du service d'arrivée,
+   * plutôt que de laisser un grade d'un autre service que le serveur refusera.
+   */
+  function changeDepartment(nextDepartmentId: string) {
+    setDepartmentId(nextDepartmentId);
+    const grades = departments.find((d) => d.id === nextDepartmentId)?.grades ?? [];
+    const lowest = [...grades].sort((a, b) => a.level - b.level)[0];
+    setGradeId(nextDepartmentId === membership?.departmentId ? (membership?.gradeId ?? "") : (lowest?.id ?? ""));
+  }
 
   useEffect(() => {
     if (state !== initialState && !state.error && !state.fieldErrors) {
@@ -70,7 +83,7 @@ export function MembershipForm({
 
       <div className="flex flex-col gap-2">
         <Label>Département</Label>
-        <Select value={departmentId} onValueChange={setDepartmentId}>
+        <Select value={departmentId} onValueChange={changeDepartment}>
           <SelectTrigger>
             <SelectValue placeholder="Choisir un département" />
           </SelectTrigger>
@@ -86,7 +99,7 @@ export function MembershipForm({
 
       <div className="flex flex-col gap-2">
         <Label>Grade</Label>
-        <Select name="gradeId" defaultValue={membership?.gradeId}>
+        <Select name="gradeId" value={gradeId} onValueChange={setGradeId}>
           <SelectTrigger>
             <SelectValue placeholder="Choisir un grade" />
           </SelectTrigger>
