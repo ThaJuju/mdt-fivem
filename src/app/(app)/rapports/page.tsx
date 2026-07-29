@@ -44,20 +44,46 @@ export default async function RapportsPage({
     typeof params.status === "string" && REPORT_STATUSES.has(params.status) ? params.status : undefined;
   const onlyMine = params.scope === "mine" || !canViewAll;
 
-  const where: Prisma.ReportWhereInput = {
-    ...(onlyMine ? { authorId: actor.id } : {}),
-    ...(typeFilter ? { type: typeFilter as Prisma.EnumReportTypeFilter["equals"] } : {}),
-    ...(statusFilter ? { status: statusFilter as Prisma.EnumReportStatusFilter["equals"] } : {}),
-    ...(q
-      ? {
-          OR: [
-            { title: { contains: q, mode: "insensitive" } },
-            { content: { contains: q, mode: "insensitive" } },
-            ...(Number.isInteger(Number(q)) ? [{ number: Number(q) }] : []),
-          ],
-        }
-      : {}),
+  /**
+   * « Mes rapports » inclut ceux où l'agent est listé comme intervenant, pas
+   * seulement ceux qu'il a rédigés : deux agents sur la même intervention,
+   * l'un rédige et ajoute l'autre — le second doit pouvoir le relire.
+   */
+  const mine: Prisma.ReportWhereInput = {
+    OR: [{ authorId: actor.id }, { officers: { some: { userId: actor.id } } }],
   };
+
+  /**
+   * Le secret médical ne doit pas fuiter par la liste des rapports.
+   *
+   * `/medical` est déjà réservé à `medical.view`, qu'aucun grade de police ne
+   * possède. Mais un rapport d'intervention EMS contient les mêmes données —
+   * lésions, soins, médicaments — donc sans ce filtre la règle se contournait
+   * en ouvrant l'onglet Rapports. Restent visibles pour tous : l'auteur et les
+   * intervenants listés, qui étaient sur place.
+   */
+  const notMedical: Prisma.ReportWhereInput = {
+    AND: [{ type: { not: "EMS_INTERVENTION" } }, { emsDetail: { is: null } }],
+  };
+  const medicalVisibility: Prisma.ReportWhereInput = {
+    OR: [notMedical, { authorId: actor.id }, { officers: { some: { userId: actor.id } } }],
+  };
+
+  const conditions: Prisma.ReportWhereInput[] = [];
+  if (onlyMine) conditions.push(mine);
+  if (!can(actor, "medical.view")) conditions.push(medicalVisibility);
+  if (typeFilter) conditions.push({ type: typeFilter as Prisma.EnumReportTypeFilter["equals"] });
+  if (statusFilter) conditions.push({ status: statusFilter as Prisma.EnumReportStatusFilter["equals"] });
+  if (q) {
+    conditions.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { content: { contains: q, mode: "insensitive" } },
+        ...(Number.isInteger(Number(q)) ? [{ number: Number(q) }] : []),
+      ],
+    });
+  }
+  const where: Prisma.ReportWhereInput = conditions.length > 0 ? { AND: conditions } : {};
 
   const [reports, total] = await Promise.all([
     prisma.report.findMany({
@@ -106,7 +132,7 @@ export default async function RapportsPage({
 
       {!canViewAll ? (
         <p className="text-xs text-muted-foreground">
-          Vous ne voyez que les rapports dont vous êtes l&apos;auteur.
+          Vous ne voyez que les rapports dont vous êtes l&apos;auteur ou un intervenant.
         </p>
       ) : null}
 

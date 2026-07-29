@@ -68,8 +68,21 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   if (!report) notFound();
 
   const isAuthor = report.authorId === actor.id;
-  if (!isAuthor && !can(actor, "reports.view_all")) {
+  // Être listé comme intervenant suffit : on relit un rapport où l'on figure,
+  // même sans la permission de consulter ceux des autres.
+  const isListedOfficer = report.officers.some((officer) => officer.userId === actor.id);
+  const wasThere = isAuthor || isListedOfficer;
+
+  if (!wasThere && !can(actor, "reports.view_all")) {
     requirePagePermission(actor, "reports.view_all");
+  }
+
+  // Secret médical : un rapport d'intervention EMS n'est lisible que par
+  // l'EMS, ou par ceux qui étaient sur place. Sans ce contrôle, la réserve de
+  // `/medical` se contournerait en ouvrant le rapport correspondant.
+  const isMedicalReport = report.type === "EMS_INTERVENTION" || report.emsDetail !== null;
+  if (isMedicalReport && !wasThere) {
+    requirePagePermission(actor, "medical.view");
   }
 
   await audit(actor, "report.view", {
