@@ -20,7 +20,9 @@ export default async function DashboardPage() {
   // Les annonces internes remontent ici : c'est la première page vue en
   // prenant son service.
   const announcements = await prisma.announcement.findMany({
-    where: { OR: [{ departmentId: null }, { departmentId: { in: departmentIds } }] },
+    where: actor.isSuperAdmin
+      ? {}
+      : { OR: [{ departmentId: null }, { departmentId: { in: departmentIds } }] },
     orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
     take: 5,
     include: {
@@ -41,27 +43,6 @@ export default async function DashboardPage() {
             : "Vous n'avez aucune affectation active pour le moment."}
         </p>
       </div>
-
-      {activeMemberships.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {activeMemberships.map((membership) => (
-            <Card key={membership.id} className="border-l-2 border-l-department">
-              <CardHeader>
-                <CardTitle className="font-mono">{membership.departmentShortName}</CardTitle>
-                <CardDescription>{membership.departmentName}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
-                <span>{membership.gradeName}</span>
-                <span className="font-mono">Matricule #{membership.badgeNumber}</span>
-                {membership.callsign ? <span className="font-mono">{membership.callsign}</span> : null}
-                {membership.isPrimary ? (
-                  <span className="mt-1 text-xs text-department">Affectation principale</span>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : null}
 
       {announcements.length > 0 ? (
         <section className="flex flex-col gap-3">
@@ -88,6 +69,27 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {activeMemberships.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {activeMemberships.map((membership) => (
+            <Card key={membership.id} className="border-l-2 border-l-department">
+              <CardHeader>
+                <CardTitle className="font-mono">{membership.departmentShortName}</CardTitle>
+                <CardDescription>{membership.departmentName}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
+                <span>{membership.gradeName}</span>
+                <span className="font-mono">Matricule #{membership.badgeNumber}</span>
+                {membership.callsign ? <span className="font-mono">{membership.callsign}</span> : null}
+                {membership.isPrimary ? (
+                  <span className="mt-1 text-xs text-department">Affectation principale</span>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : null}
 
       {can(actor, "admin.panel") ? (

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ActorProvider, type ClientActor } from "@/components/actor-provider";
 import { TopBar, type UnitStatusInfo } from "@/components/top-bar";
 import { AppNav } from "@/components/app-nav";
+import { AnnouncementBanner, type BannerAnnouncement } from "@/components/announcement-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor();
@@ -21,6 +22,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         },
       })
     : null;
+
+  /**
+   * Annonces épinglées destinées à cet agent. Un super-admin les voit toutes,
+   * comme dans le module RH : sans cela, un compte sans affectation ne verrait
+   * jamais une annonce ciblée sur un service.
+   */
+  const departmentIds = actor.memberships.filter((m) => m.status === "ACTIVE").map((m) => m.departmentId);
+  const pinned = await prisma.announcement.findMany({
+    where: actor.isSuperAdmin
+      ? { isPinned: true }
+      : { isPinned: true, OR: [{ departmentId: null }, { departmentId: { in: departmentIds } }] },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+    include: {
+      author: { select: { firstName: true, lastName: true } },
+      department: { select: { shortName: true } },
+    },
+  });
+
+  const bannerAnnouncements: BannerAnnouncement[] = pinned.map((announcement) => ({
+    id: announcement.id,
+    title: announcement.title,
+    content: announcement.content,
+    departmentShortName: announcement.department?.shortName ?? null,
+    authorName: `${announcement.author.firstName} ${announcement.author.lastName}`,
+    updatedAt: announcement.updatedAt.toISOString(),
+  }));
 
   const unitInfo: UnitStatusInfo | null = unitMembership
     ? {
@@ -55,6 +83,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex min-h-screen min-w-0 flex-col">
         <TopBar unit={unitInfo} />
         <AppNav />
+        <AnnouncementBanner announcements={bannerAnnouncements} />
         <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
           <div className="page-shell">{children}</div>
         </main>
