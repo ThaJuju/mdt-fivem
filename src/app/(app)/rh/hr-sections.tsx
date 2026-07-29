@@ -281,20 +281,27 @@ export function ShiftsSection({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="font-medium">Heures de service</h2>
+      <div>
+        <p className="eyebrow">Présence opérationnelle</p>
+        <h2 className="mt-1 text-lg font-semibold">Heures de service</h2>
+      </div>
 
-      <div className="rounded-md border border-border bg-card p-3">
+      <div className="panel-surface relative overflow-hidden rounded-lg p-5">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-department to-transparent opacity-60" />
         {openShift ? (
-          <form action={endAction} className="flex flex-wrap items-center gap-3">
+          <form action={endAction} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <input type="hidden" name="shiftId" value={openShift.id} />
-            <span className="text-sm">
-              En service depuis{" "}
-              <span className="font-mono">
-                {format(new Date(openShift.startedAt), "HH:mm", { locale: fr })}
-              </span>{" "}
-              ({openShift.departmentShortName})
-            </span>
-            <Button type="submit" size="sm" variant="outline" disabled={isEnding}>
+            <div className="flex items-center gap-3">
+              <span className="status-dot" />
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-department uppercase">Service en cours</p>
+                <p className="mt-1 text-sm">
+                  <span className="font-mono font-semibold">{openShift.departmentShortName}</span>
+                  <span className="text-muted-foreground"> · depuis {format(new Date(openShift.startedAt), "HH:mm", { locale: fr })}</span>
+                </p>
+              </div>
+            </div>
+            <Button type="submit" className="h-9 border-destructive/35 hover:bg-destructive/10 hover:text-destructive" variant="outline" disabled={isEnding}>
               {isEnding ? <Loader2 className="size-4 animate-spin" /> : <Square className="size-4" />}
               Terminer le service
             </Button>
@@ -304,22 +311,26 @@ export function ShiftsSection({
             Vous n&apos;êtes affecté à aucun service : impossible de pointer.
           </p>
         ) : (
-          <form action={startAction} className="flex flex-wrap items-center gap-3">
-            <Select name="departmentId" defaultValue={departments[0]?.id}>
-              <SelectTrigger size="sm" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((department) => (
-                  <SelectItem key={department.id} value={department.id}>
-                    {department.shortName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="submit" size="sm" disabled={isStarting}>
+          <form action={startAction} className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="flex flex-col gap-2">
+              <Label>Service d&apos;affectation</Label>
+              <Select name="departmentId" defaultValue={departments[0]?.id}>
+                <SelectTrigger className="h-10 w-full sm:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.shortName} — {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Démarre le décompte de vos heures opérationnelles.</p>
+            </div>
+            <Button type="submit" className="h-10 px-5" disabled={isStarting}>
               {isStarting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-              Prendre son service
+              Prendre mon service
             </Button>
           </form>
         )}

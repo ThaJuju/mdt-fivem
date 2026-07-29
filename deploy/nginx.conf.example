@@ -1,0 +1,118 @@
+# Reverse proxy nginx pour le MDT.
+#
+# À adapter (nom de domaine, chemins de certificats) puis à placer dans
+# /etc/nginx/sites-available/mdt, avec un lien dans sites-enabled/.
+# Vérifier avec `nginx -t` avant `systemctl reload nginx`.
+#
+# Quatre points ne sont pas décoratifs : sans eux l'application perd une
+# fonction ou une protection. Ils sont signalés par « REQUIS » ci-dessous.
+
+upstream mdt {
+    # Le serveur maison (Next + Socket.io) écoute sur ce port. Le faire écouter
+    # sur 127.0.0.1 uniquement (HOSTNAME=127.0.0.1) pour qu'on ne puisse pas
+    # contourner nginx en visant le port directement — sans quoi tous les
+    # en-têtes de confiance posés ici deviennent falsifiables.
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mdt.example.com;
+
+    # Tout en HTTPS : le cookie de session n'est marqué `Secure` que si la
+    # requête arrive en TLS.
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name mdt.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/mdt.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mdt.example.com/privkey.pem;
+
+    # REQUIS — les envois d'images sont bornés à 5 Mo côté application. Le
+    # défaut de nginx est 1 Mo : sans cette ligne, nginx refuse lui-même les
+    # photos au-delà avec sa propre page d'erreur 413, que l'application ne
+    # voit jamais et ne peut donc pas expliquer à l'agent. Un peu au-dessus de
+    # 5 Mo pour absorber l'encodage multipart.
+    client_max_body_size 6m;
+
+    # Journalisation sans le corps des requêtes : les formulaires du MDT
+    # transportent des mots de passe et des données de dossiers.
+    access_log /var/log/nginx/mdt.access.log;
+    error_log  /var/log/nginx/mdt.error.log;
+
+    location / {
+        proxy_pass http://mdt;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+
+        # REQUIS — c'est ce qui rend la limitation des tentatives de connexion
+        # réelle, et l'adresse du journal d'audit exploitable.
+        #
+        # `$proxy_add_x_forwarded_for` AJOUTE l'adresse du pair à la fin de ce
+        # que le client a envoyé : la valeur de confiance est donc la DERNIÈRE
+        # entrée, pas la première. `src/lib/client-ip.ts` la lit depuis la
+        # droite, avec TRUSTED_PROXY_HOPS proxys (défaut 1 = ce nginx seul).
+        #
+        # Si un CDN est ajouté DEVANT ce nginx, passer TRUSTED_PROXY_HOPS à 2
+        # dans le .env — sinon l'application prendrait pour adresse client
+        # celle que le CDN a reçue du client, c'est-à-dire une valeur que le
+        # client contrôle.
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP         $remote_addr;
+
+        # REQUIS — sans cet en-tête, l'application croit répondre en HTTP clair
+        # et ne marque pas le cookie de session `Secure`.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+
+        # Le rendu de Next arrive en flux (pages avec loading.tsx) : bufferiser
+        # ferait attendre l'agent devant une page blanche jusqu'à la fin du
+        # rendu, au lieu de lui montrer le squelette tout de suite.
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    # REQUIS — dispatch temps réel. Socket.io a besoin de la bascule WebSocket ;
+    # sans ce bloc la connexion retombe en long-polling ou échoue, et le
+    # bandeau de dispatch affiche « hors ligne » sur tous les postes. C'est
+    # aussi le chemin du 10-99 : il doit passer.
+    location /api/socket {
+        proxy_pass http://mdt;
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Un socket de dispatch reste ouvert tant que l'agent est en service.
+        proxy_read_timeout 24h;
+        proxy_send_timeout 24h;
+        proxy_buffering off;
+    }
+
+    # Les fichiers envoyés ne sont PAS servis en statique : ils passent par
+    # /api/uploads/[filename], qui vérifie la session. Ne pas ajouter d'alias
+    # vers le répertoire uploads/ — ce serait rendre publiques des photos de
+    # dossiers, y compris médicaux.
+
+    location /_next/static/ {
+        proxy_pass http://mdt;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        # Contenu au nom haché par le build : immuable.
+        proxy_cache_valid 200 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}

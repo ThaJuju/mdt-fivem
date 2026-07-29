@@ -167,6 +167,7 @@ model Citizen {
   occupation  String?
   imageUrl    String?
   fingerprint String?   @unique
+  isMedicalOnly Boolean @default(false)
   isDeceased  Boolean   @default(false)
   deceasedAt  DateTime?
   createdAt   DateTime  @default(now())
@@ -181,6 +182,7 @@ model Citizen {
   warrants           Warrant[]
   bolos              Bolo[]
   medicalRecord      MedicalRecord?
+  medicalAttachments MedicalAttachment[]
   charges            Charge[]
 
   @@index([lastName, firstName])
@@ -534,6 +536,16 @@ model MedicalRecord {
   notes        String?
   isFitForDuty Boolean?
   updatedAt    DateTime @updatedAt
+}
+
+model MedicalAttachment {
+  id        String   @id @default(cuid())
+  citizenId String
+  citizen   Citizen  @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([citizenId])
 }
 
 enum Triage {

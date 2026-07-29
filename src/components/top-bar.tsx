@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { LogOut, KeyRound } from "lucide-react";
+import { LogOut, KeyRound, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useActor } from "./actor-provider";
 import { GlobalSearch } from "./global-search";
@@ -60,14 +60,15 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
 
   return (
     <header
-      className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b-2 px-3 shadow-[0_8px_24px_rgb(0_0_0/0.28)] sm:px-5"
+      className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b px-3 shadow-[0_12px_40px_rgb(0_0_0/0.32)] backdrop-blur-xl sm:px-5"
       style={{
         borderBottomColor: statusBorderColor(unit?.status),
-        backgroundColor: isPanic ? "color-mix(in srgb, var(--alert) 12%, var(--card))" : "var(--card)",
+        backgroundColor: isPanic ? "color-mix(in srgb, var(--alert) 12%, var(--card))" : "color-mix(in srgb, var(--card) 92%, transparent)",
       }}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-7 items-center border border-department/45 bg-department/10 px-2 font-mono text-xs font-semibold tracking-[0.14em] text-department">
+        <span className="flex h-9 items-center gap-2 rounded-md border border-department/35 bg-department/10 px-3 font-mono text-xs font-semibold tracking-[0.14em] text-department shadow-[0_0_24px_color-mix(in_srgb,var(--department-accent)_10%,transparent)]">
+          <Radio className="size-3.5" />
           {primary ? primary.departmentShortName : "MDT"}
         </span>
         {primary ? (
@@ -87,7 +88,8 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
         )}
 
         {unit ? (
-          <span className="flex h-7 items-center gap-2 border-l border-border pl-3 font-mono text-xs">
+          <span className="flex h-8 items-center gap-2 rounded-md border border-border/70 bg-background/45 px-2.5 font-mono text-xs">
+            <span className="status-dot" aria-hidden />
             <span className="font-semibold tracking-wide text-foreground">{unit.callsign}</span>
             <span
               className={
@@ -110,7 +112,7 @@ export function TopBar({ unit }: { unit: UnitStatusInfo | null }) {
 
       <div className="flex items-center gap-1.5 sm:gap-3">
         <GlobalSearch />
-        <span className="hidden border-l border-border pl-3 font-mono text-xs font-medium tracking-[0.08em] text-muted-foreground tabular-nums md:inline">
+        <span className="hidden rounded-md border border-border/60 bg-background/45 px-2.5 py-1.5 font-mono text-xs font-medium tracking-[0.08em] text-muted-foreground tabular-nums md:inline">
           {timeLabel}
         </span>
         <span className="hidden text-xs font-medium text-foreground sm:inline">

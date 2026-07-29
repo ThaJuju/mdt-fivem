@@ -25,15 +25,18 @@ export default async function CitoyensPage({
   const q = typeof params.q === "string" ? params.q : undefined;
   const sortDir = params.dir === "desc" ? "desc" : "asc";
 
-  const where: Prisma.CitizenWhereInput = q
-    ? {
+  const where: Prisma.CitizenWhereInput = {
+    isMedicalOnly: false,
+    ...(q
+      ? {
         OR: [
           { firstName: { contains: q, mode: "insensitive" } },
           { lastName: { contains: q, mode: "insensitive" } },
           { phone: { contains: q, mode: "insensitive" } },
         ],
       }
-    : {};
+      : {}),
+  };
 
   const [citizens, total] = await Promise.all([
     prisma.citizen.findMany({

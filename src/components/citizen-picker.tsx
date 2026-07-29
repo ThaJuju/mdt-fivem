@@ -18,9 +18,13 @@ import { searchCitizens, type CitizenSearchResult } from "@/app/(app)/citoyens/s
 export function CitizenPicker({
   name,
   defaultValue,
+  placeholder = "Aucun propriétaire",
+  searchPlaceholder = "Rechercher un citoyen…",
 }: {
   name: string;
   defaultValue?: { id: string; label: string };
+  placeholder?: string;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(defaultValue ?? null);
@@ -50,13 +54,13 @@ export function CitizenPicker({
             aria-expanded={open}
             className="w-full justify-between font-normal"
           >
-            {selected ? selected.label : "Aucun propriétaire"}
+            {selected ? selected.label : placeholder}
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-80 p-0">
           <Command shouldFilter={false}>
-            <CommandInput placeholder="Rechercher un citoyen…" onValueChange={handleSearch} />
+            <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearch} />
             <CommandList>
               <CommandEmpty>{isPending ? "Recherche…" : "Aucun citoyen trouvé."}</CommandEmpty>
               <CommandGroup>

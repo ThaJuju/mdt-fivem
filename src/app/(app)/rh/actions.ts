@@ -462,6 +462,7 @@ export async function startShift(_prevState: FormState, formData: FormData): Pro
     await prisma.shift.create({ data: { userId: actor.id, departmentId } });
     await audit(actor, "shift.start", { metadata: { departmentId } });
     revalidatePath("/rh");
+    revalidatePath("/");
     return {};
   } catch (err) {
     if (err instanceof ActionError) return { error: err.message };
@@ -484,6 +485,7 @@ export async function endShift(_prevState: FormState, formData: FormData): Promi
     await prisma.shift.update({ where: { id: shiftId }, data: { endedAt: new Date() } });
     await audit(actor, "shift.end", { entityId: shiftId });
     revalidatePath("/rh");
+    revalidatePath("/");
     return {};
   } catch (err) {
     if (err instanceof ActionError) return { error: err.message };

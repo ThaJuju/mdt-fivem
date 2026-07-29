@@ -23,7 +23,7 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
 
   const citizen = await prisma.citizen.findUnique({
-    where: { id },
+    where: { id, isMedicalOnly: false },
     include: {
       notes: { orderBy: { createdAt: "desc" }, include: { author: true } },
       licenses: { orderBy: { issuedAt: "desc" } },

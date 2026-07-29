@@ -23,6 +23,7 @@ export async function globalSearch(query: string): Promise<GlobalSearchGroup[]> 
   if (can(actor, "citizens.view")) {
     const citizens = await prisma.citizen.findMany({
       where: {
+        isMedicalOnly: false,
         OR: [
           { firstName: { contains: trimmed, mode: "insensitive" } },
           { lastName: { contains: trimmed, mode: "insensitive" } },

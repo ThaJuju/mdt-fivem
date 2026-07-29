@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { getActor, can } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ActorProvider, type ClientActor } from "@/components/actor-provider";
-import { TopBar, type UnitStatusInfo } from "@/components/top-bar";
-import { AppNav } from "@/components/app-nav";
+import { AppNav, type UnitStatusInfo } from "@/components/app-nav";
 import { AnnouncementBanner, type BannerAnnouncement } from "@/components/announcement-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -80,11 +79,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           __html: `document.documentElement.dataset.department=${JSON.stringify(departmentSlug)};`,
         }}
       />
-      <div className="flex min-h-screen min-w-0 flex-col">
-        <TopBar unit={unitInfo} />
-        <AppNav />
+      <div className="relative flex min-h-screen min-w-0 flex-col">
+        <div
+          className="console-grid pointer-events-none fixed inset-x-0 top-0 z-0 h-[32rem] opacity-40"
+          aria-hidden
+        />
+        <AppNav unit={unitInfo} />
         <AnnouncementBanner announcements={bannerAnnouncements} />
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
+        <main className="relative z-10 min-w-0 flex-1 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
           <div className="page-shell">{children}</div>
         </main>
       </div>

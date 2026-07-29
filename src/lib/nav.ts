@@ -12,12 +12,19 @@ import {
   RadioTower,
   HeartPulse,
   Briefcase,
+  Activity,
+  Ambulance,
+  MessagesSquare,
 } from "lucide-react";
+
+export type NavScope = "SHARED" | "POLICE" | "EMS" | "ADMIN";
 
 export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  scope: NavScope;
+  exact?: boolean;
   /** Permission requise pour voir l'entrée ; absente = visible dès qu'on est connecté. */
   permission?: string;
 };
@@ -27,16 +34,19 @@ export type NavItem = {
  * aucune autre modification du shell n'est nécessaire.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/citoyens", label: "Citoyens", icon: Users, permission: "citizens.view" },
-  { href: "/vehicules", label: "Véhicules", icon: Car, permission: "vehicles.view" },
-  { href: "/armes", label: "Armes", icon: Crosshair, permission: "weapons.view" },
-  { href: "/rapports", label: "Rapports", icon: FileText, permission: "reports.view" },
-  { href: "/code-penal", label: "Code pénal", icon: Scale, permission: "penalcode.view" },
-  { href: "/dispatch", label: "Dispatch", icon: RadioTower, permission: "dispatch.view" },
-  { href: "/mandats", label: "Mandats", icon: Gavel, permission: "warrants.view" },
-  { href: "/bolos", label: "BOLO", icon: Megaphone, permission: "bolos.view" },
-  { href: "/medical", label: "Médical", icon: HeartPulse, permission: "medical.view" },
-  { href: "/rh", label: "RH", icon: Briefcase, permission: "hr.roster.view" },
-  { href: "/admin", label: "Administration", icon: ShieldCheck, permission: "admin.panel" },
+  { href: "/", label: "Accueil", icon: LayoutDashboard, scope: "SHARED", exact: true },
+  { href: "/citoyens", label: "Citoyens", icon: Users, scope: "POLICE", permission: "citizens.view" },
+  { href: "/vehicules", label: "Véhicules", icon: Car, scope: "POLICE", permission: "vehicles.view" },
+  { href: "/armes", label: "Armes", icon: Crosshair, scope: "POLICE", permission: "weapons.view" },
+  { href: "/code-penal", label: "Code pénal", icon: Scale, scope: "POLICE", permission: "penalcode.view" },
+  { href: "/mandats", label: "Mandats", icon: Gavel, scope: "POLICE", permission: "warrants.view" },
+  { href: "/bolos", label: "BOLO", icon: Megaphone, scope: "POLICE", permission: "bolos.view" },
+  { href: "/medical", label: "Centre EMS", icon: HeartPulse, scope: "EMS", permission: "medical.view", exact: true },
+  { href: "/medical/patients", label: "Patients", icon: Activity, scope: "EMS", permission: "medical.view" },
+  { href: "/medical/interventions", label: "Interventions", icon: Ambulance, scope: "EMS", permission: "medical.view" },
+  { href: "/rapports", label: "Rapports", icon: FileText, scope: "SHARED", permission: "reports.view" },
+  { href: "/dispatch", label: "Dispatch", icon: RadioTower, scope: "SHARED", permission: "dispatch.view" },
+  { href: "/interservices", label: "Interservices", icon: MessagesSquare, scope: "SHARED" },
+  { href: "/rh", label: "RH", icon: Briefcase, scope: "SHARED", permission: "hr.roster.view" },
+  { href: "/admin", label: "Administration", icon: ShieldCheck, scope: "ADMIN", permission: "admin.panel" },
 ];

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, CalendarDays, MapPin, Phone, UserRound } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { requireActor, requirePagePermission, can } from "@/lib/auth";
@@ -10,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIAGE_LABELS, EMS_OUTCOME_LABELS, triageClass } from "@/lib/medical-labels";
 import { MedicalRecordForm, FitnessForm } from "./medical-form";
+import { PatientIdentityCard } from "./patient-identity-form";
+import { MedicalPhotosSection } from "./medical-photos-section";
 
 export const metadata: Metadata = { title: "Dossier médical — MDT" };
 
@@ -23,6 +26,7 @@ export default async function MedicalRecordPage({ params }: { params: Promise<{ 
     where: { id },
     include: {
       medicalRecord: true,
+      medicalAttachments: { orderBy: { createdAt: "desc" } },
       reportInvolvements: {
         where: { report: { emsDetail: { isNot: null } } },
         orderBy: { report: { occurredAt: "desc" } },
@@ -52,26 +56,55 @@ export default async function MedicalRecordPage({ params }: { params: Promise<{ 
   const canCertify = can(actor, "medical.fitness.certify");
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {citizen.firstName} {citizen.lastName}
-        </h1>
-        <Link href={`/citoyens/${citizen.id}`} className="text-sm text-muted-foreground hover:underline">
-          Voir la fiche civile
-        </Link>
-        {citizen.isDeceased ? <Badge variant="outline">Décédé</Badge> : null}
-        {citizen.medicalRecord?.isFitForDuty === true ? (
-          <Badge variant="outline">Apte au port d&apos;arme</Badge>
-        ) : citizen.medicalRecord?.isFitForDuty === false ? (
-          <Badge className="bg-destructive text-destructive-foreground">Inapte</Badge>
-        ) : null}
-      </div>
+    <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-6">
+      <section className="panel-surface relative overflow-hidden rounded-xl">
+        <div className="pointer-events-none absolute -top-28 right-0 size-80 rounded-full bg-department/12 blur-3xl" />
+        <div className="relative p-6 sm:p-8">
+          <Link href="/medical/patients" className="mb-6 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-department">
+            <ArrowLeft className="size-3.5" />Retour aux patients
+          </Link>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-department/30 bg-department/10 text-department shadow-[0_0_30px_color-mix(in_srgb,var(--department-accent)_12%,transparent)]">
+              <UserRound className="size-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="eyebrow">Dossier médical patient</p>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight">{citizen.firstName} {citizen.lastName}</h1>
+                {citizen.isDeceased ? <Badge variant="outline">Décédé</Badge> : null}
+                {citizen.medicalRecord?.isFitForDuty === true ? <Badge variant="outline">Apte</Badge> : null}
+                {citizen.medicalRecord?.isFitForDuty === false ? <Badge variant="destructive">Inapte</Badge> : null}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5"><CalendarDays className="size-3.5 text-department" />{format(citizen.dob, "dd MMMM yyyy", { locale: fr })}</span>
+                <span className="flex items-center gap-1.5"><Phone className="size-3.5 text-department" />{citizen.phone ?? "Téléphone non renseigné"}</span>
+                <span className="flex items-center gap-1.5"><MapPin className="size-3.5 text-department" />{citizen.address ?? "Adresse non renseignée"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <PatientIdentityCard
+        canEdit={canEdit}
+        patient={{
+          id: citizen.id,
+          firstName: citizen.firstName,
+          lastName: citizen.lastName,
+          dob: citizen.dob.toISOString().slice(0, 10),
+          gender: citizen.gender,
+          phone: citizen.phone,
+          address: citizen.address,
+          postal: citizen.postal,
+          height: citizen.height,
+          weight: citizen.weight,
+        }}
+      />
+
+      <div className="grid items-start gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>
-          <CardHeader>
-            <CardTitle>Dossier</CardTitle>
+          <CardHeader className="border-b border-border/70 pb-4">
+            <div><p className="eyebrow">Informations cliniques</p><CardTitle className="mt-1">Dossier médical</CardTitle></div>
           </CardHeader>
           <CardContent>
             {canEdit ? (
@@ -176,6 +209,12 @@ export default async function MedicalRecordPage({ params }: { params: Promise<{ 
           </Card>
         </div>
       </div>
+
+      <MedicalPhotosSection
+        citizenId={citizen.id}
+        canEdit={canEdit}
+        photos={citizen.medicalAttachments.map((attachment) => ({ id: attachment.id, url: attachment.url }))}
+      />
     </div>
   );
 }

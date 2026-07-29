@@ -82,11 +82,11 @@ export async function createReport(_prevState: FormState, formData: FormData): P
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-    const isMember = actor.memberships.some(
-      (m) => m.departmentId === parsed.data.departmentId && m.status === "ACTIVE",
-    );
-    if (!isMember && !actor.isSuperAdmin) {
-      return { error: "Vous ne pouvez rédiger un rapport que pour un département dont vous êtes membre." };
+    const primary =
+      actor.memberships.find((membership) => membership.isPrimary && membership.status === "ACTIVE") ??
+      actor.memberships.find((membership) => membership.status === "ACTIVE");
+    if (parsed.data.departmentId !== primary?.departmentId && !actor.isSuperAdmin) {
+      return { error: "Vous ne pouvez rédiger un rapport que pour votre service principal actif." };
     }
 
     const report = await prisma.report.create({

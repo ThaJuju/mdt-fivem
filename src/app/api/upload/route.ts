@@ -4,6 +4,12 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { getActor, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import {
+  consumeRateLimit,
+  formatRetryDelay,
+  peekRateLimit,
+  type RateLimitRule,
+} from "@/lib/rate-limit";
 import { MAX_UPLOAD_BYTES, UPLOAD_DIR, detectImageFormat } from "@/lib/uploads";
 
 /**
@@ -22,8 +28,22 @@ import { MAX_UPLOAD_BYTES, UPLOAD_DIR, detectImageFormat } from "@/lib/uploads";
  * - nom de fichier généré aléatoirement et extension imposée par le format
  *   détecté : aucune partie du nom ne vient du client, donc pas de traversée
  *   de chemin possible ;
- * - stockage hors de `public/`, relu via une route authentifiée.
+ * - stockage hors de `public/`, relu via une route authentifiée ;
+ * - quota par compte, pour qu'un agent — ou un compte détourné — ne puisse
+ *   pas remplir le disque du serveur 5 Mo par requête.
  */
+
+/**
+ * Quota d'envoi, compté en mégaoctets sur une fenêtre glissante : 60 Mo par
+ * quart d'heure et par compte. La facturation au poids plutôt qu'au nombre de
+ * requêtes est ce qui protège réellement le disque — cent vignettes ne
+ * coûtent presque rien, douze photos pleine taille suffisent à saturer.
+ *
+ * Le compte est nominatif et non lié à l'adresse IP : la session est déjà
+ * vérifiée à ce stade, autant s'appuyer sur une identité qu'on ne peut pas
+ * falsifier.
+ */
+const UPLOAD_QUOTA: RateLimitRule = { limit: 60, windowMs: 15 * 60 * 1000 };
 
 /** Modules dont un formulaire accepte une image. */
 const UPLOAD_PERMISSIONS = [
@@ -52,6 +72,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Vérifié avant de lire le corps de la requête : au-delà du quota, on ne
+  // veut même pas des octets en mémoire.
+  const quotaKey = `upload:${actor.id}`;
+  const quota = peekRateLimit(quotaKey, UPLOAD_QUOTA);
+  if (!quota.ok) {
+    return NextResponse.json(
+      {
+        error: `Quota d'envoi atteint. Réessayez dans ${formatRetryDelay(quota.retryAfterMs)}.`,
+      },
+      { status: 429 },
+    );
+  }
+
   const formData = await request.formData().catch(() => null);
   const file = formData?.get("file");
   if (!(file instanceof File)) {
@@ -77,6 +110,11 @@ export async function POST(request: Request) {
       { status: 415 },
     );
   }
+
+  // Facturé au mégaoctet entamé, une fois le fichier reconnu comme une image
+  // valide : un envoi rejeté pour format n'entame pas le quota de l'agent.
+  const megabytes = Math.max(1, Math.ceil(bytes.byteLength / (1024 * 1024)));
+  consumeRateLimit(quotaKey, UPLOAD_QUOTA, megabytes);
 
   const filename = `${randomBytes(16).toString("hex")}.${format.extension}`;
   await mkdir(UPLOAD_DIR, { recursive: true });

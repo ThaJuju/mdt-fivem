@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getActor, verifyPassword, hashPassword } from "@/lib/auth";
+import { getActor, verifyPassword, hashPassword, revokeOtherSessions } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { changePasswordSchema } from "@/lib/validations/auth";
 
@@ -39,7 +39,18 @@ export async function changePassword(
     where: { id: actor.id },
     data: { passwordHash, mustChangePassword: false },
   });
-  await audit(actor, "auth.password_changed", { entity: "User", entityId: actor.id });
+
+  // Changer son mot de passe est le réflexe de quelqu'un qui pense s'être
+  // fait voler son accès : il faut donc que ce geste ferme réellement les
+  // autres sessions ouvertes. Le poste d'où part la demande est épargné,
+  // sinon l'agent se déconnecterait lui-même en se protégeant.
+  const revoked = await revokeOtherSessions(actor.id);
+
+  await audit(actor, "auth.password_changed", {
+    entity: "User",
+    entityId: actor.id,
+    metadata: { revokedSessions: revoked },
+  });
 
   redirect("/");
 }

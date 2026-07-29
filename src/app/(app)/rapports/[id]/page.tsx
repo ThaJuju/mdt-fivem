@@ -72,6 +72,16 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   // même sans la permission de consulter ceux des autres.
   const isListedOfficer = report.officers.some((officer) => officer.userId === actor.id);
   const wasThere = isAuthor || isListedOfficer;
+  const primary =
+    actor.memberships.find((membership) => membership.isPrimary && membership.status === "ACTIVE") ??
+    actor.memberships.find((membership) => membership.status === "ACTIVE");
+
+  // Les dossiers métier restent cloisonnés par service. Une participation
+  // explicite au rapport est la seule passerelle, pour les interventions
+  // réellement conjointes Police/EMS.
+  if (!actor.isSuperAdmin && report.departmentId !== primary?.departmentId && !wasThere) {
+    requirePagePermission(actor, "__department.report");
+  }
 
   if (!wasThere && !can(actor, "reports.view_all")) {
     requirePagePermission(actor, "reports.view_all");

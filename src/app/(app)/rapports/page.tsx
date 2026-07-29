@@ -38,6 +38,9 @@ export default async function RapportsPage({
   const sortField = params.sort === "occurredAt" ? "occurredAt" : "number";
   const sortDir = params.dir === "asc" ? "asc" : "desc";
   const canViewAll = can(actor, "reports.view_all");
+  const primary =
+    actor.memberships.find((membership) => membership.isPrimary && membership.status === "ACTIVE") ??
+    actor.memberships.find((membership) => membership.status === "ACTIVE");
 
   const typeFilter = typeof params.type === "string" && REPORT_TYPES.has(params.type) ? params.type : undefined;
   const statusFilter =
@@ -70,6 +73,7 @@ export default async function RapportsPage({
   };
 
   const conditions: Prisma.ReportWhereInput[] = [];
+  if (!actor.isSuperAdmin && primary) conditions.push({ departmentId: primary.departmentId });
   if (onlyMine) conditions.push(mine);
   if (!can(actor, "medical.view")) conditions.push(medicalVisibility);
   if (typeFilter) conditions.push({ type: typeFilter as Prisma.EnumReportTypeFilter["equals"] });

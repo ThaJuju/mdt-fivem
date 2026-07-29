@@ -7,7 +7,9 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { MembershipStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import { clientIp, isSecureRequest } from "./client-ip";
 import { ActionError } from "./errors";
+import { domainAllowsDepartment } from "./permissions";
 import { SESSION_COOKIE_NAME } from "./session-constants";
 
 export { SESSION_COOKIE_NAME };
@@ -59,6 +61,26 @@ export async function verifyPassword(passwordHash: string, password: string): Pr
   }
 }
 
+let decoyHash: Promise<string> | null = null;
+
+/**
+ * Vérifie le mot de passe contre un hachage factice, et retourne toujours
+ * faux.
+ *
+ * Sans cela, un identifiant inexistant répond tout de suite tandis qu'un
+ * identifiant valide coûte le temps d'un Argon2 : l'écart suffit à énumérer
+ * les comptes du serveur. On paie donc le même prix dans les deux cas.
+ *
+ * Le hachage factice est calculé une fois, à la première tentative sur un
+ * compte inconnu, à partir d'un mot de passe aléatoire que personne ne
+ * connaît — aucun secret en dur dans le code.
+ */
+export async function verifyAgainstDecoy(password: string): Promise<false> {
+  decoyHash ??= hashPassword(randomBytes(32).toString("hex"));
+  await verifyPassword(await decoyHash, password);
+  return false;
+}
+
 // ── Sessions ────────────────────────────────────────────────────────────
 
 function generateToken(): string {
@@ -72,31 +94,9 @@ function hashToken(token: string): string {
 async function clientInfo() {
   const headerList = await headers();
   return {
-    ip: headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+    ip: await clientIp(),
     userAgent: headerList.get("user-agent"),
   };
-}
-
-/**
- * Le cookie n'est marqué `Secure` que si la requête arrive réellement en
- * HTTPS. Se fier à `NODE_ENV === "production"` était un piège : en production
- * derrière du HTTP simple (LAN, IP directe), le navigateur refuse de stocker
- * un cookie `Secure` et l'utilisateur semble déconnecté à chaque clic.
- *
- * La détection se fait via `x-forwarded-proto`, posé par un reverse proxy qui
- * termine le TLS. Sans proxy, l'en-tête est absent et le cookie reste
- * utilisable en clair ; le jour où l'application passe derrière nginx en
- * HTTPS, il redevient `Secure` sans rien changer ici.
- *
- * `SESSION_COOKIE_SECURE=true` dans `.env` force le comportement si besoin.
- */
-async function shouldUseSecureCookie(): Promise<boolean> {
-  const forced = process.env.SESSION_COOKIE_SECURE;
-  if (forced === "true") return true;
-  if (forced === "false") return false;
-
-  const headerList = await headers();
-  return headerList.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https";
 }
 
 /** Crée une session, pose le cookie httpOnly et met à jour la date de dernière connexion. */
@@ -119,7 +119,12 @@ export async function createSession(userId: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: await shouldUseSecureCookie(),
+    // `Secure` seulement si la requête est réellement arrivée en HTTPS : se
+    // fier à `NODE_ENV === "production"` était un piège, car en HTTP simple
+    // (LAN, IP directe) le navigateur refuse un cookie `Secure` et l'agent
+    // semble déconnecté à chaque clic. Derrière nginx en TLS, il redevient
+    // `Secure` sans rien changer ici.
+    secure: await isSecureRequest(),
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
@@ -136,22 +141,71 @@ export async function destroySession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
+/**
+ * Déconnecte toutes les sessions d'un compte *sauf* celle qui exécute la
+ * requête en cours.
+ *
+ * À appeler dès que le mot de passe change : sans cela, un cookie volé reste
+ * valable quatorze jours après que la victime a réagi, et changer son mot de
+ * passe — le seul réflexe que tout le monde a — ne servait à rien.
+ *
+ * Retourne le nombre de sessions fermées, pour le journal d'audit.
+ */
+export async function revokeOtherSessions(userId: string): Promise<number> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const { count } = await prisma.session.deleteMany({
+    where: {
+      userId,
+      ...(token ? { NOT: { tokenHash: hashToken(token) } } : {}),
+    },
+  });
+  return count;
+}
+
+/**
+ * Déconnecte toutes les sessions d'un compte, sans exception.
+ *
+ * Utilisé par les actions d'administration : réinitialiser le mot de passe
+ * de quelqu'un ou désactiver son compte doit couper l'accès *maintenant*, pas
+ * à l'expiration du cookie. L'admin agissant sur un autre compte que le sien,
+ * il n'y a pas de session à épargner.
+ */
+export async function revokeAllSessions(userId: string): Promise<number> {
+  const { count } = await prisma.session.deleteMany({ where: { userId } });
+  return count;
+}
+
+/**
+ * Le service « courant » d'un acteur : son adhésion principale si elle est
+ * active, sinon la première adhésion active trouvée. C'est ce service unique
+ * qui détermine à la fois les permissions et le cloisonnement — d'où ce
+ * sélecteur partagé, pour que `computePermissions()` et `can()` ne puissent
+ * jamais désigner deux services différents.
+ */
+function activePrimaryMembership<T extends { status: MembershipStatus; isPrimary: boolean }>(
+  memberships: T[],
+): T | undefined {
+  const active = memberships.filter((membership) => membership.status === "ACTIVE");
+  return active.find((membership) => membership.isPrimary) ?? active[0];
+}
+
 function computePermissions(
-  memberships: { status: MembershipStatus; grade: { permissions: string[] } }[],
+  memberships: { status: MembershipStatus; isPrimary: boolean; grade: { permissions: string[] } }[],
 ): Set<string> {
+  const current = activePrimaryMembership(memberships);
   const permissions = new Set<string>();
-  for (const membership of memberships) {
-    if (membership.status !== "ACTIVE") continue;
-    for (const permission of membership.grade.permissions) {
-      permissions.add(permission);
-    }
+  if (!current) return permissions;
+  for (const permission of current.grade.permissions) {
+    permissions.add(permission);
   }
   return permissions;
 }
 
 /**
  * Résout l'utilisateur courant depuis le cookie de session et calcule ses
- * permissions effectives (union des grades de ses adhésions actives).
+ * permissions effectives du service principal actif. Les droits d'une
+ * seconde affectation ne traversent jamais le contexte courant.
  * Mémoïsé pour la durée de la requête via `React.cache`.
  */
 export const getActor = cache(async (): Promise<Actor | null> => {
@@ -215,9 +269,17 @@ export async function requireActor(): Promise<Actor> {
 
 // ── Permissions ────────────────────────────────────────────────────────
 
+/**
+ * Le cloisonnement par service se lit désormais dans le catalogue
+ * (`restrictedTo`), pas dans une liste codée en dur ici : déclarer un domaine
+ * réservé suffit, sans repasser par ce fichier.
+ */
 export function can(actor: Actor | null, permission: string): boolean {
   if (!actor) return false;
   if (actor.isSuperAdmin) return true;
+  const domain = permission.split(".")[0];
+  const primary = activePrimaryMembership(actor.memberships);
+  if (!domainAllowsDepartment(domain, primary?.departmentType)) return false;
   return actor.permissions.has(permission);
 }
 

@@ -1,7 +1,12 @@
-import "server-only";
-
 /**
  * Règles de sécurité de l'upload d'images.
+ *
+ * Ce module ne porte volontairement pas le marqueur `server-only` : il ne
+ * contient ni secret ni accès base, uniquement de la reconnaissance de format
+ * et un chemin. Le marqueur lèverait une erreur à l'import depuis `server.ts`,
+ * qui tourne en Node simple et a besoin des mêmes règles pour le ménage des
+ * fichiers orphelins. Une seule définition des noms valides, partagée par le
+ * runtime Next et par la tâche d'entretien.
  *
  * Le SVG est volontairement exclu : un SVG est un document XML capable de
  * porter du script, donc servi depuis notre propre origine il ouvre une

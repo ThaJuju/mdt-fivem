@@ -17,14 +17,16 @@ export function LoginForm({ depuis }: { depuis?: string }) {
     <form action={formAction} className="flex flex-col gap-5">
       {depuis ? <input type="hidden" name="depuis" value={depuis} /> : null}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="username">Identifiant</Label>
+        <Label htmlFor="username" className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Identifiant de service
+        </Label>
         <Input
           id="username"
           name="username"
           autoComplete="username"
           autoFocus
           aria-invalid={Boolean(state.fieldErrors?.username)}
-          className="font-mono"
+          className="h-11 bg-background/65 px-3.5 font-mono"
         />
         {state.fieldErrors?.username?.map((message) => (
           <p key={message} className="text-sm text-destructive">
@@ -34,7 +36,9 @@ export function LoginForm({ depuis }: { depuis?: string }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Mot de passe</Label>
+        <Label htmlFor="password" className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Mot de passe
+        </Label>
         <div className="relative">
           <Input
             id="password"
@@ -42,7 +46,7 @@ export function LoginForm({ depuis }: { depuis?: string }) {
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             aria-invalid={Boolean(state.fieldErrors?.password)}
-            className="pr-10"
+            className="h-11 bg-background/65 px-3.5 pr-11"
           />
           <button
             type="button"
@@ -66,9 +70,9 @@ export function LoginForm({ depuis }: { depuis?: string }) {
         </p>
       ) : null}
 
-      <Button type="submit" disabled={isPending} className="mt-1">
+      <Button type="submit" disabled={isPending} className="mt-2 h-11">
         {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-        Se connecter
+        Ouvrir la session
       </Button>
     </form>
   );

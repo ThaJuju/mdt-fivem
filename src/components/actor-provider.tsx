@@ -55,5 +55,12 @@ export function useActor(): ClientActor {
 export function useCan(permission: string): boolean {
   const actor = useActor();
   if (actor.isSuperAdmin) return true;
+  const primary =
+    actor.memberships.find((membership) => membership.isPrimary && membership.status === "ACTIVE") ??
+    actor.memberships.find((membership) => membership.status === "ACTIVE");
+  const domain = permission.split(".")[0];
+  const policeOnly = new Set(["citizens", "vehicles", "weapons", "penalcode", "warrants", "bolos", "charges"]);
+  if (domain === "medical" && primary?.departmentType !== "EMS") return false;
+  if (policeOnly.has(domain) && primary?.departmentType !== "POLICE") return false;
   return actor.permissions.includes(permission);
 }

@@ -32,6 +32,11 @@ chaud.
 volontairement si `ADMIN_PASSWORD` est absent — ne jamais lui donner de valeur
 par défaut dans le code.
 
+Variables optionnelles : `PORT`, `HOSTNAME` (mettre `127.0.0.1` en production,
+pour qu'on ne puisse pas contourner nginx en visant le port directement),
+`TRUSTED_PROXY_HOPS` (nombre de proxys devant l'application, défaut 1) et
+`SESSION_COOKIE_SECURE` pour forcer le drapeau du cookie de session.
+
 ## Ne pas casser la session de l'utilisateur en nettoyant
 
 Après un test, ne PAS repasser `admin.mustChangePassword` à `true` ni vider
@@ -50,14 +55,84 @@ une entrée au catalogue suffit à la rendre attribuable depuis le panel admin �
 aucune autre modification nécessaire.
 
 Chaîne de résolution : `User → Membership (une par département) → Grade →
-permissions: string[]`. Les permissions effectives d'un acteur sont l'union
-des grades de ses **adhésions actives** (`Membership.status === "ACTIVE"`),
-calculée dans `getActor()` (`src/lib/auth.ts`).
+permissions: string[]`. Les permissions effectives d'un acteur sont celles
+d'**une seule adhésion** : son adhésion principale si elle est active, sinon
+la première adhésion active trouvée. Ce n'est pas l'union de ses adhésions —
+un agent affecté à deux services n'additionne jamais leurs droits, il exerce
+avec la casquette qu'il porte. Sélecteur unique `activePrimaryMembership()`
+dans `src/lib/auth.ts`, partagé par `computePermissions()` et `can()` pour
+qu'ils ne puissent pas désigner deux services différents.
+
+**Cloisonnement par service** : un domaine peut porter `restrictedTo` dans le
+catalogue (`citizens`, `vehicles`, `weapons`, `penalcode`, `warrants`,
+`bolos`, `charges` → `POLICE` ; `medical` → `EMS`). `can()` lit cette
+contrainte via `domainAllowsDepartment()` ; elle n'est plus codée en dur dans
+`auth.ts`. Un acteur sans adhésion active est refusé sur tout domaine
+cloisonné.
 
 Règle non négociable : toute server action commence par
 `assertCan(actor, "domaine.action")` (voir `src/lib/auth.ts`). `isSuperAdmin`
 court-circuite tous les contrôles. `useCan()` côté client sert uniquement à
 masquer l'UI, jamais à remplacer le contrôle serveur.
+
+## Sessions et limitation de débit
+
+Changer un mot de passe ferme les **autres** sessions du compte
+(`revokeOtherSessions()`), jamais celle qui exécute la requête. Les actions
+d'administration qui réinitialisent un mot de passe ou désactivent un compte
+appellent `revokeAllSessions()` — l'admin agit sur un autre compte que le
+sien, il n'y a rien à épargner.
+
+La connexion est limitée par `src/lib/rate-limit.ts` (fenêtre glissante **en
+mémoire**, donc par processus : à réécrire le jour où l'application tourne en
+plusieurs instances). Trois compteurs superposés — identifiant+adresse (5),
+adresse (20), identifiant seul (30) sur 15 minutes. Le premier est volontaire :
+bloquer sur l'identifiant seul permettrait à n'importe qui de verrouiller le
+compte d'un agent en cinq essais. Seuls les échecs comptent, un succès remet
+tout à zéro. L'envoi d'images a son propre quota, facturé au mégaoctet.
+
+## Adresse du client derrière le proxy
+
+Production : le site tourne derrière un reverse proxy nginx (modèle prêt à
+adapter dans `deploy/nginx.conf.example`).
+
+**Ne jamais relire `x-forwarded-for` à la main.** Passer par `clientIp()` /
+`clientIpKey()` de `src/lib/client-ip.ts`, seul endroit qui sait quelle entrée
+est digne de confiance. Le snippet nginx habituel
+(`$proxy_add_x_forwarded_for`) **ajoute** l'adresse du pair à la fin de ce que
+le client a envoyé : l'entrée fiable est la **dernière**, pas la première.
+Prendre `[0]` revient à indexer la limitation de débit et le journal d'audit
+sur une valeur choisie par l'attaquant.
+
+`TRUSTED_PROXY_HOPS` (défaut 1) donne le nombre de proxys qui ajoutent leur
+entrée : nginx seul = 1, un CDN devant nginx = 2. Si la chaîne reçue est plus
+courte que ce nombre, `clientIp()` renvoie `null` (« inconnue » en clé) plutôt
+que de faire confiance à une valeur douteuse.
+
+`isSecureRequest()` du même module décide du drapeau `Secure` du cookie de
+session, à partir de `x-forwarded-proto`. Sans cet en-tête l'application se
+croit en HTTP clair et n'appose pas `Secure` — c'est voulu (LAN, IP directe),
+mais cela veut dire que la ligne `proxy_set_header X-Forwarded-Proto $scheme`
+n'est pas optionnelle en production.
+
+Deux autres réglages nginx ne sont pas décoratifs : `client_max_body_size 6m`
+(sinon nginx refuse les photos avant l'application, avec sa propre page 413) et
+le bloc WebSocket sur `/api/socket` (sinon le dispatch temps réel — donc le
+10-99 — ne passe pas).
+
+## Entretien périodique
+
+`src/lib/maintenance.ts`, déclenché par `server.ts` au démarrage puis toutes
+les six heures : suppression des sessions périmées et des images qu'aucune
+fiche ne référence plus. Comme le temps réel, ce ménage n'existe pas sous
+`npm run dev:next` — l'application fonctionne, elle accumule.
+
+Le module reçoit son client Prisma en paramètre et ne porte pas `server-only`,
+parce que `server.ts` tourne en Node simple, hors runtime React : ce marqueur
+y lèverait une erreur à l'import. Même raison pour `src/lib/uploads.ts`, dont
+les règles de nommage servent aux deux côtés. Les fichiers de moins de 24 h
+sont épargnés — un envoi tout juste déposé n'est pas encore référencé par le
+formulaire qui le recevra.
 
 ## Audit
 

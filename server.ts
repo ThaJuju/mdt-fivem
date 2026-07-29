@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import next from "next";
 import { Server as SocketServer } from "socket.io";
 import { PrismaClient } from "@prisma/client";
+import { runMaintenance } from "./src/lib/maintenance";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT ?? 3000);
@@ -22,6 +23,29 @@ const handle = app.getRequestHandler();
 const prisma = new PrismaClient();
 
 const SESSION_COOKIE_NAME = "mdt_session";
+
+/**
+ * Ménage : sessions périmées et images qu'aucune fiche ne référence plus.
+ * Toutes les six heures plutôt qu'à chaque requête — c'est un balayage de
+ * tables entières, il n'a rien à faire dans le rendu d'une page.
+ */
+const MAINTENANCE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+async function maintenanceTick() {
+  try {
+    const report = await runMaintenance(prisma);
+    if (report.expiredSessions > 0 || report.orphanUploads > 0) {
+      console.log(
+        `> ménage : ${report.expiredSessions} session(s) périmée(s), ` +
+          `${report.orphanUploads} image(s) orpheline(s) supprimée(s)`,
+      );
+    }
+  } catch (error) {
+    // Le ménage ne doit jamais faire tomber le serveur : au pire il attend
+    // le prochain passage.
+    console.error("> échec du ménage périodique :", error);
+  }
+}
 
 function readCookie(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -68,5 +92,10 @@ app.prepare().then(() => {
 
   httpServer.listen(port, hostname, () => {
     console.log(`> MDT prêt sur http://${hostname}:${port}`);
+
+    void maintenanceTick();
+    // `unref()` : ce minuteur ne doit pas à lui seul maintenir le processus en
+    // vie au moment de l'arrêt.
+    setInterval(() => void maintenanceTick(), MAINTENANCE_INTERVAL_MS).unref();
   });
 });

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireActor, assertCan, hashPassword } from "@/lib/auth";
+import { requireActor, assertCan, hashPassword, revokeAllSessions } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { ActionError } from "@/lib/errors";
 import {
@@ -91,7 +91,20 @@ export async function updateUser(_prevState: FormState, formData: FormData): Pro
       },
     });
 
-    await audit(actor, "user.update", { entity: "User", entityId: parsed.data.id });
+    // `getActor()` refuse déjà un compte désactivé, donc l'accès est coupé
+    // immédiatement ; on supprime quand même les sessions pour ne pas laisser
+    // traîner des jetons valables jusqu'à leur expiration si le compte est
+    // réactivé plus tard.
+    let revoked = 0;
+    if (!parsed.data.isActive) {
+      revoked = await revokeAllSessions(parsed.data.id);
+    }
+
+    await audit(actor, "user.update", {
+      entity: "User",
+      entityId: parsed.data.id,
+      metadata: revoked > 0 ? { revokedSessions: revoked } : undefined,
+    });
     revalidatePath(`/admin/comptes/${parsed.data.id}`);
     revalidatePath("/admin/comptes");
     return {};
@@ -118,7 +131,17 @@ export async function resetPassword(_prevState: FormState, formData: FormData): 
       data: { passwordHash, mustChangePassword: true },
     });
 
-    await audit(actor, "user.reset_password", { entity: "User", entityId: parsed.data.id });
+    // Une réinitialisation par un admin répond en général à un compte
+    // compromis : laisser vivre les sessions ouvertes viderait le geste de
+    // son sens. Aucune session à épargner ici, l'admin agit sur un autre
+    // compte que le sien.
+    const revoked = await revokeAllSessions(parsed.data.id);
+
+    await audit(actor, "user.reset_password", {
+      entity: "User",
+      entityId: parsed.data.id,
+      metadata: { revokedSessions: revoked },
+    });
     revalidatePath(`/admin/comptes/${parsed.data.id}`);
     return {};
   } catch (err) {

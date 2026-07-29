@@ -1,8 +1,8 @@
 import "server-only";
 
-import { headers } from "next/headers";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import { clientIp } from "./client-ip";
 
 type AuditOptions = {
   entity?: string;
@@ -24,8 +24,7 @@ export async function audit(
   action: string,
   options: AuditOptions = {},
 ): Promise<void> {
-  const headerList = await headers();
-  const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const ip = await clientIp();
 
   await prisma.auditLog.create({
     data: {

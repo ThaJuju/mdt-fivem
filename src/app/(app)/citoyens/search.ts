@@ -1,6 +1,6 @@
 "use server";
 
-import { requireActor, assertCan } from "@/lib/auth";
+import { requireActor, can } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type CitizenSearchResult = {
@@ -12,12 +12,14 @@ export type CitizenSearchResult = {
 /** Recherche légère pour les sélecteurs de propriétaire (véhicules, armes). */
 export async function searchCitizens(query: string): Promise<CitizenSearchResult[]> {
   const actor = await requireActor();
-  assertCan(actor, "citizens.view");
+  const hasMedicalAccess = can(actor, "medical.view");
+  if (!can(actor, "citizens.view") && !hasMedicalAccess) return [];
 
   if (query.trim().length < 2) return [];
 
   const citizens = await prisma.citizen.findMany({
     where: {
+      ...(hasMedicalAccess ? {} : { isMedicalOnly: false }),
       OR: [
         { firstName: { contains: query, mode: "insensitive" } },
         { lastName: { contains: query, mode: "insensitive" } },

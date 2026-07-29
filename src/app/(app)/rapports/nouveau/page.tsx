@@ -11,9 +11,11 @@ export default async function NouveauRapportPage() {
   requirePagePermission(actor, "reports.create");
 
   // Un rapport ne peut être rattaché qu'à un service dont l'agent est membre actif.
-  const departmentIds = actor.memberships.filter((m) => m.status === "ACTIVE").map((m) => m.departmentId);
+  const primary =
+    actor.memberships.find((membership) => membership.isPrimary && membership.status === "ACTIVE") ??
+    actor.memberships.find((membership) => membership.status === "ACTIVE");
   const departments = await prisma.department.findMany({
-    where: actor.isSuperAdmin ? { isActive: true } : { id: { in: departmentIds }, isActive: true },
+    where: actor.isSuperAdmin ? { isActive: true } : { id: primary?.departmentId, isActive: true },
     orderBy: { order: "asc" },
     select: { id: true, shortName: true, name: true },
   });

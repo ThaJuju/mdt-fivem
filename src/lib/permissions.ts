@@ -8,6 +8,10 @@
  *
  * Convention : `reports.edit` porte sur les rapports de l'auteur,
  * `reports.edit_any` sur ceux de tout le monde. Même logique pour delete.
+ *
+ * Un domaine peut être réservé à certains types de service (`restrictedTo`).
+ * Cette contrainte vit ici, et non dans `can()`, pour que la promesse du
+ * catalogue reste vraie : déclarer un domaine suffit, y compris cloisonné.
  */
 
 export type Permission = {
@@ -15,16 +19,29 @@ export type Permission = {
   label: string;
 };
 
+/** Reflet de `DepartmentType` (schéma Prisma), redéclaré pour rester importable côté client. */
+export type DepartmentTypeKey = "POLICE" | "EMS" | "DOJ" | "ADMIN";
+
 export type PermissionDomain = {
   key: string;
   label: string;
   permissions: Permission[];
+  /**
+   * Types de service autorisés à exercer ce domaine. Absent = ouvert à tous.
+   *
+   * Le contrôle porte sur le service *principal actif* de l'acteur : un
+   * médecin affecté en second au LSPD ne consulte pas les fiches civiles avec
+   * sa casquette EMS, et réciproquement le secret médical ne suit pas un
+   * policier qui aurait gardé une vieille adhésion EMS.
+   */
+  restrictedTo?: DepartmentTypeKey[];
 };
 
 export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "citizens",
     label: "Citoyens",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter les fiches" },
       { key: "create", label: "Créer une fiche" },
@@ -38,6 +55,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "vehicles",
     label: "Véhicules",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter les véhicules" },
       { key: "create", label: "Enregistrer un véhicule" },
@@ -49,6 +67,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "weapons",
     label: "Armes",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter les armes" },
       { key: "manage", label: "Gérer les armes" },
@@ -71,11 +90,13 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "charges",
     label: "Charges",
+    restrictedTo: ["POLICE"],
     permissions: [{ key: "manage", label: "Gérer les charges" }],
   },
   {
     key: "penalcode",
     label: "Code pénal",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter le code pénal" },
       { key: "edit", label: "Modifier le code pénal" },
@@ -84,6 +105,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "warrants",
     label: "Mandats",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter les mandats" },
       { key: "request", label: "Demander un mandat" },
@@ -94,6 +116,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "bolos",
     label: "BOLO",
+    restrictedTo: ["POLICE"],
     permissions: [
       { key: "view", label: "Consulter les BOLO" },
       { key: "manage", label: "Gérer les BOLO" },
@@ -114,6 +137,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
   {
     key: "medical",
     label: "Médical",
+    restrictedTo: ["EMS"],
     permissions: [
       { key: "view", label: "Consulter les dossiers médicaux" },
       { key: "edit", label: "Modifier un dossier médical" },
@@ -158,6 +182,29 @@ const ALL_PERMISSIONS_SET = new Set(ALL_PERMISSIONS);
 
 export function isValidPermission(permission: string): boolean {
   return ALL_PERMISSIONS_SET.has(permission);
+}
+
+const DOMAIN_RESTRICTIONS = new Map<string, Set<string>>(
+  PERMISSIONS_CATALOG.filter((domain) => domain.restrictedTo).map((domain) => [
+    domain.key,
+    new Set<string>(domain.restrictedTo),
+  ]),
+);
+
+/**
+ * Le service `departmentType` a-t-il le droit d'exercer ce domaine ?
+ *
+ * Un domaine sans `restrictedTo` est ouvert à tous. Un acteur sans service
+ * principal actif (`departmentType` nul) est refusé sur tout domaine
+ * cloisonné : sans casquette, on n'exerce ni la police ni la médecine.
+ */
+export function domainAllowsDepartment(
+  domainKey: string,
+  departmentType: string | null | undefined,
+): boolean {
+  const allowed = DOMAIN_RESTRICTIONS.get(domainKey);
+  if (!allowed) return true;
+  return departmentType != null && allowed.has(departmentType);
 }
 
 export function permissionLabel(permission: string): string {
