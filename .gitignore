@@ -67,9 +67,24 @@ next-env.d.ts
 *.sql.gz
 pg_dump*
 
-# Réglages locaux de Claude Code (propres à une machine). Les skills partagés
-# du projet, eux, restent suivis.
-.claude/settings.local.json
+# Outillage d'agents et d'éditeurs : n'a rien à voir avec le MDT.
+#
+# .agents/skills contient des paquets de documentation (Prisma…) installés par
+# l'outillage ; .claude et .windsurf ne sont que des fermes de liens
+# symboliques qui pointent dedans. Rien de tout cela ne décrit le projet, et
+# les liens sont morts pour qui clone le dépôt.
+#
+# À ne pas confondre avec CLAUDE.md et AGENTS.md, à la racine : ceux-là sont la
+# documentation du projet et restent suivis.
+.agents/
+.claude/
+.windsurf/
+.cursor/
+.aider*
+.vscode/
+.idea/
+*.swp
+*~
 
 # Scripts jetables écrits à la racine pendant un test ou un diagnostic.
 /_*.tmp.ts
