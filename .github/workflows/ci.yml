@@ -1,0 +1,31 @@
+name: CI
+
+# Sans intégration continue, les tests écrits aujourd'hui cessent d'être
+# lancés en deux semaines. Lint, types et tests sur chaque poussée.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Le client Prisma est généré, pas versionné : sans cette étape, le
+      # typecheck ne trouve ni les modèles ni les énumérations.
+      - run: npx prisma generate
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm run test
