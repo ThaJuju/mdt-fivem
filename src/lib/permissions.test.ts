@@ -14,13 +14,11 @@ import {
  * n'exerce encore : elles se cochent, elles n'ouvrent rien.
  *
  * Toute entrée ici est une promesse faite à l'administrateur et non tenue.
- * La liste doit se vider, pas s'allonger — d'où le test : ajouter une
- * permission au catalogue sans jamais l'appeler fait échouer la suite.
- *
- * `citizens.delete` : issue #4, la suppression d'une fiche n'est câblée nulle
- * part.
+ * La liste est vide, et doit le rester : ajouter une permission au catalogue
+ * sans jamais l'appeler fait échouer la suite. C'est exactement la dérive
+ * qu'avait connue `citizens.delete` — déclarée, cochable, sans aucun effet.
  */
-const KNOWN_UNWIRED: string[] = ["citizens.delete"];
+const KNOWN_UNWIRED: string[] = [];
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

@@ -24,6 +24,8 @@ export async function globalSearch(query: string): Promise<GlobalSearchGroup[]> 
     const citizens = await prisma.citizen.findMany({
       where: {
         isMedicalOnly: false,
+        // Archivée = retirée de la circulation : elle ne remonte plus ici.
+        archivedAt: null,
         OR: [
           { firstName: { contains: trimmed, mode: "insensitive" } },
           { lastName: { contains: trimmed, mode: "insensitive" } },

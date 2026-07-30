@@ -47,6 +47,7 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
       { key: "create", label: "Créer une fiche" },
       { key: "edit", label: "Modifier une fiche" },
       { key: "delete", label: "Supprimer une fiche" },
+      { key: "archive", label: "Archiver une fiche" },
       { key: "notes.create", label: "Ajouter une note" },
       { key: "notes.delete", label: "Supprimer une note" },
       { key: "licenses.manage", label: "Gérer les licences" },

@@ -196,6 +196,11 @@ model Citizen {
   isMedicalOnly Boolean @default(false)
   isDeceased  Boolean   @default(false)
   deceasedAt  DateTime?
+  /// Fiche retirée des listes et de la recherche, mais conservée : elle reste
+  /// atteignable depuis les rapports, charges et mandats qui la citent. C'est
+  /// la bonne primitive quand une fiche ne doit plus circuler sans pour
+  /// autant disparaître — une suppression casserait les dossiers.
+  archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

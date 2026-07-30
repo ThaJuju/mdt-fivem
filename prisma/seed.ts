@@ -61,7 +61,13 @@ const POLICE_TIERS = cumulative([
     "dispatch.calls.create",
     "dispatch.calls.edit",
   ],
-  ["citizens.licenses.manage", "citizens.notes.delete", "dispatch.calls.close", "reports.view_all"],
+  [
+    "citizens.licenses.manage",
+    "citizens.notes.delete",
+    "citizens.archive",
+    "dispatch.calls.close",
+    "reports.view_all",
+  ],
   [
     "citizens.delete",
     "vehicles.delete",

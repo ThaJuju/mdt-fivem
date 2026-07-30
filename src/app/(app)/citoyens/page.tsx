@@ -27,6 +27,9 @@ export default async function CitoyensPage({
 
   const where: Prisma.CitizenWhereInput = {
     isMedicalOnly: false,
+    // Une fiche archivée ne circule plus : elle reste consultable depuis les
+    // dossiers qui la citent, pas dans les listes du fichier.
+    archivedAt: null,
     ...(q
       ? {
         OR: [

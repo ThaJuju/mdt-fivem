@@ -9,23 +9,31 @@ export type CitizenSearchResult = {
   dob: string;
 };
 
-/** Recherche légère pour les sélecteurs de propriétaire (véhicules, armes). */
+/** Recherche légère pour les sélecteurs de citoyens et de patients. */
 export async function searchCitizens(query: string): Promise<CitizenSearchResult[]> {
   const actor = await requireActor();
   const hasMedicalAccess = can(actor, "medical.view");
   if (!can(actor, "citizens.view") && !hasMedicalAccess) return [];
 
-  if (query.trim().length < 2) return [];
+  const normalizedQuery = query.trim();
 
   const citizens = await prisma.citizen.findMany({
     where: {
       ...(hasMedicalAccess ? {} : { isMedicalOnly: false }),
-      OR: [
-        { firstName: { contains: query, mode: "insensitive" } },
-        { lastName: { contains: query, mode: "insensitive" } },
-      ],
+      // On ne rattache pas un nouveau dossier à une fiche archivée : elle est
+      // sortie de la circulation, la proposer dans un sélecteur la ferait
+      // revenir par la petite porte.
+      archivedAt: null,
+      ...(normalizedQuery
+        ? {
+            OR: [
+              { firstName: { contains: normalizedQuery, mode: "insensitive" as const } },
+              { lastName: { contains: normalizedQuery, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
     },
-    orderBy: { lastName: "asc" },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     take: 10,
     select: { id: true, firstName: true, lastName: true, dob: true },
   });
