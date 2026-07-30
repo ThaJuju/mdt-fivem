@@ -1,18 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Prisma } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
 import { differenceInYears, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { requireActor, requirePagePermission, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { expireStaleRecords } from "@/lib/expiry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CitizenForm } from "../citizen-form";
 import { NotesSection } from "./notes-section";
 import { LicensesSection } from "./licenses-section";
 import { DeceasedToggle } from "./deceased-toggle";
+import { CriminalRecordSection, InvolvementHistorySection } from "./criminal-record-section";
 
 export const metadata: Metadata = { title: "Fiche citoyen — MDT" };
 
@@ -22,21 +25,84 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
 
   const { id } = await params;
 
-  const citizen = await prisma.citizen.findUnique({
-    where: { id, isMedicalOnly: false },
-    include: {
-      notes: { orderBy: { createdAt: "desc" }, include: { author: true } },
-      licenses: { orderBy: { issuedAt: "desc" } },
-      ownedVehicles: { orderBy: { plate: "asc" } },
-      ownedWeapons: { orderBy: { serialNumber: "asc" } },
-      warrants: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" } },
-      medicalRecord: { select: { isFitForDuty: true } },
-    },
-  });
+  // C'est l'écran sur lequel on décide d'interpeller quelqu'un : le bandeau
+  // rouge ne doit jamais annoncer un mandat déjà périmé.
+  await expireStaleRecords();
+  const now = new Date();
+
+  /**
+   * Le casier n'est pas ouvert à tous : qui n'a pas `reports.view_all` ne voit
+   * que les rapports auxquels il a participé — même règle que
+   * `/rapports/[id]`, appliquée ici en filtre plutôt qu'en refus, pour qu'un
+   * agent de terrain voie au moins ce qu'il a lui-même constaté.
+   */
+  const canViewAllReports = can(actor, "reports.view_all");
+  const visibleReports: Prisma.ReportWhereInput = canViewAllReports
+    ? {}
+    : { OR: [{ authorId: actor.id }, { officers: { some: { userId: actor.id } } }] };
+
+  // Le secret médical vaut ici comme ailleurs : une intervention EMS ne
+  // remonte jamais sur la fiche civile, quel que soit le rôle du citoyen.
+  const nonMedicalReports: Prisma.ReportWhereInput = {
+    type: { not: "EMS_INTERVENTION" },
+    emsDetail: { is: null },
+  };
+
+  const [citizen, charges, involvements] = await Promise.all([
+    prisma.citizen.findUnique({
+      where: { id, isMedicalOnly: false },
+      include: {
+        notes: { orderBy: { createdAt: "desc" }, include: { author: true } },
+        licenses: { orderBy: { issuedAt: "desc" } },
+        ownedVehicles: { orderBy: { plate: "asc" } },
+        ownedWeapons: { orderBy: { serialNumber: "asc" } },
+        // Ceinture et bretelles : le balayage ci-dessus a déjà basculé les
+        // mandats échus, cette clause garantit qu'aucun ne remonte comme actif
+        // même si l'écriture a échoué.
+        warrants: {
+          where: {
+            status: "ACTIVE",
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        medicalRecord: { select: { isFitForDuty: true } },
+      },
+    }),
+    // Casier : uniquement les charges retenues sur des rapports validés. Un
+    // brouillon n'est pas une condamnation.
+    prisma.charge.findMany({
+      where: {
+        citizenId: id,
+        isGuilty: true,
+        report: { status: "APPROVED", ...nonMedicalReports, ...visibleReports },
+      },
+      include: {
+        offense: { select: { code: true, name: true, type: true } },
+        report: { select: { id: true, number: true, occurredAt: true } },
+      },
+      orderBy: { report: { occurredAt: "desc" } },
+      take: 100,
+    }),
+    prisma.reportInvolvement.findMany({
+      where: { citizenId: id, report: { ...nonMedicalReports, ...visibleReports } },
+      include: {
+        report: { select: { id: true, number: true, title: true, type: true, occurredAt: true } },
+      },
+      orderBy: { report: { occurredAt: "desc" } },
+      take: 50,
+    }),
+  ]);
 
   if (!citizen) notFound();
 
-  await audit(actor, "citizen.view", { entity: "Citizen", entityId: citizen.id });
+  // Consulter un casier est plus intrusif que consulter une fiche : la trace
+  // doit permettre de le distinguer après coup.
+  await audit(actor, "citizen.view", {
+    entity: "Citizen",
+    entityId: citizen.id,
+    metadata: { criminalRecord: charges.length, involvements: involvements.length },
+  });
 
   const flaggedNotes = citizen.notes.filter((note) => note.isFlagged);
 
@@ -206,12 +272,48 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
         licenses={citizen.licenses.map((license) => ({
           id: license.id,
           type: license.type,
-          status: license.status,
+          // Même filet que pour les mandats : une licence dont la date est
+          // passée s'affiche « Expirée », quel que soit le statut stocké.
+          status:
+            license.status === "VALID" && license.expiresAt && license.expiresAt < now
+              ? "EXPIRED"
+              : license.status,
           points: license.points,
           issuedAt: license.issuedAt.toISOString().slice(0, 10),
           expiresAt: license.expiresAt ? license.expiresAt.toISOString().slice(0, 10) : null,
         }))}
         canManage={can(actor, "citizens.licenses.manage")}
+      />
+
+      <CriminalRecordSection
+        isPartial={!canViewAllReports}
+        charges={charges.map((charge) => ({
+          id: charge.id,
+          offenseCode: charge.offense.code,
+          offenseName: charge.offense.name,
+          offenseType: charge.offense.type,
+          count: charge.count,
+          fine: charge.fine,
+          jailMinutes: charge.jailMinutes,
+          points: charge.points,
+          isPaid: charge.isPaid,
+          reportId: charge.report.id,
+          reportNumber: charge.report.number,
+          occurredAt: charge.report.occurredAt.toISOString(),
+        }))}
+      />
+
+      <InvolvementHistorySection
+        isPartial={!canViewAllReports}
+        involvements={involvements.map((involvement) => ({
+          id: involvement.id,
+          role: involvement.role,
+          reportId: involvement.report.id,
+          reportNumber: involvement.report.number,
+          reportTitle: involvement.report.title,
+          reportType: involvement.report.type,
+          occurredAt: involvement.report.occurredAt.toISOString(),
+        }))}
       />
 
       <NotesSection

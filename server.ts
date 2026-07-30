@@ -34,10 +34,11 @@ const MAINTENANCE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 async function maintenanceTick() {
   try {
     const report = await runMaintenance(prisma);
-    if (report.expiredSessions > 0 || report.orphanUploads > 0) {
+    if (report.expiredSessions > 0 || report.orphanUploads > 0 || report.expiredDocuments > 0) {
       console.log(
         `> ménage : ${report.expiredSessions} session(s) périmée(s), ` +
-          `${report.orphanUploads} image(s) orpheline(s) supprimée(s)`,
+          `${report.orphanUploads} image(s) orpheline(s) supprimée(s), ` +
+          `${report.expiredDocuments} document(s) expiré(s)`,
       );
     }
   } catch (error) {

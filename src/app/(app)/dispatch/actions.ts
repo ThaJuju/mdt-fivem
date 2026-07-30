@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireActor, assertCan } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { ActionError } from "@/lib/errors";
-import { broadcastDispatchUpdate } from "@/lib/realtime";
+import { broadcastDispatchUpdate, broadcastPanic } from "@/lib/realtime";
 import {
   callSchema,
   callStatusSchema,
@@ -123,6 +123,10 @@ export async function closeCall(_prevState: FormState, formData: FormData): Prom
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
+    // Clôturer un appel remet ses unités en disponible : si l'une d'elles
+    // était en 10-99, l'alerte tombe et les autres postes doivent le savoir.
+    const clearedPanics: string[] = [];
+
     await prisma.$transaction(async (tx) => {
       await tx.call.update({
         where: { id: parsed.data.callId },
@@ -131,8 +135,11 @@ export async function closeCall(_prevState: FormState, formData: FormData): Prom
       // Les unités engagées redeviennent disponibles.
       const assignments = await tx.callUnit.findMany({
         where: { callId: parsed.data.callId },
-        select: { unitId: true },
+        select: { unitId: true, unit: { select: { status: true } } },
       });
+      for (const assignment of assignments) {
+        if (assignment.unit.status === "PANIC") clearedPanics.push(assignment.unitId);
+      }
       if (assignments.length > 0) {
         await tx.unit.updateMany({
           where: { id: { in: assignments.map((a) => a.unitId) }, status: { not: "OFF_DUTY" } },
@@ -151,6 +158,7 @@ export async function closeCall(_prevState: FormState, formData: FormData): Prom
 
     await audit(actor, "call.close", { entity: "Call", entityId: parsed.data.callId });
     syncDispatch();
+    for (const unitId of clearedPanics) broadcastPanic(unitId);
     return {};
   } catch (err) {
     if (err instanceof ActionError) return { error: err.message };
@@ -221,13 +229,26 @@ export async function setUnitStatus(_prevState: FormState, formData: FormData): 
     });
     if (!membership) assertCan(actor, "dispatch.units.manage");
 
+    const before = await prisma.unit.findUnique({
+      where: { id: parsed.data.unitId },
+      select: { status: true },
+    });
+    if (!before) return { error: "Cette unité n'existe plus." };
+
     await prisma.unit.update({ where: { id: parsed.data.unitId }, data: { status: parsed.data.status } });
     await audit(actor, "unit.status", {
       entity: "Unit",
       entityId: parsed.data.unitId,
-      metadata: { status: parsed.data.status },
+      // L'ancien statut est ce qui permet de relire un 10-99 après coup : sa
+      // levée est aussi datée que son déclenchement.
+      metadata: { from: before.status, status: parsed.data.status },
     });
     syncDispatch();
+    // Déclenchement comme levée : dans les deux cas, les postes qui ne
+    // regardent pas le dispatch doivent voir le bandeau apparaître ou partir.
+    if (parsed.data.status === "PANIC" || before.status === "PANIC") {
+      broadcastPanic(parsed.data.unitId);
+    }
     return {};
   } catch (err) {
     if (err instanceof ActionError) return { error: err.message };
@@ -286,9 +307,13 @@ export async function deleteUnit(_prevState: FormState, formData: FormData): Pro
     assertCan(actor, "dispatch.units.manage");
 
     const unitId = String(formData.get("unitId"));
+    const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { status: true } });
     await prisma.unit.delete({ where: { id: unitId } });
     await audit(actor, "unit.delete", { entity: "Unit", entityId: unitId });
     syncDispatch();
+    // Supprimer une unité en 10-99 lève l'alerte : sans ce signal, le bandeau
+    // resterait affiché sur les postes jusqu'à leur prochaine navigation.
+    if (unit?.status === "PANIC") broadcastPanic(unitId);
     return {};
   } catch (err) {
     if (err instanceof ActionError) return { error: err.message };

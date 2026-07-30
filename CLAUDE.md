@@ -11,6 +11,9 @@ données indépendante du serveur de jeu, alimentée à la main.
 npm run dev               # serveur maison (Next + Socket.io) — PORT/HOSTNAME surchargeables
 npm run dev:next          # Next seul, sans temps réel
 npm run build             # build de prod (lint + typecheck inclus)
+npm test                  # tests unitaires (vitest, sans base)
+npm run test:watch        # les mêmes, en continu
+npm run typecheck         # tsc --noEmit seul
 npm start                 # prod, via le même serveur maison
 npx prisma migrate dev    # nouvelle migration après modification du schéma
 npx prisma db seed        # rejoue le seed (idempotent, upserts)
@@ -120,12 +123,46 @@ Deux autres réglages nginx ne sont pas décoratifs : `client_max_body_size 6m`
 le bloc WebSocket sur `/api/socket` (sinon le dispatch temps réel — donc le
 10-99 — ne passe pas).
 
+## Temps réel : deux canaux
+
+`src/lib/realtime.ts` expose deux émetteurs, et la distinction compte :
+
+- `broadcastDispatchUpdate()` → `dispatch:update`, écouté par le seul tableau
+  de dispatch (`useDispatchSync`). Signal sans charge utile : le client
+  recharge par le rendu serveur, les permissions restent appliquées.
+- `broadcastPanic(unitId)` → `dispatch:panic`, écouté par `PanicAlert`, monté
+  dans `(app)/layout.tsx` donc **sur tous les modules**. C'est ce qui fait
+  qu'un 10-99 atteint l'agent en train de rédiger un rapport. Émis dans les
+  deux sens, déclenchement et levée, par `setUnitStatus`, `closeCall` et
+  `deleteUnit` — les trois endroits qui peuvent changer un état `PANIC`.
+
+`PanicAlert` ouvre sa connexion avec `forceNew: true` : sans cela,
+socket.io-client rend la même instance aux deux composants, et quitter le
+tableau de dispatch (qui appelle `socket.disconnect()` en se démontant)
+fermerait aussi le canal d'alerte, silencieusement.
+
+Le bandeau n'est pas masquable tant que l'alerte dure ; seul le son se coupe
+(préférence par poste dans `localStorage`, clé `mdt:10-99-son`). Le son est
+synthétisé à la volée et échoue silencieusement tant que l'agent n'a pas
+interagi avec la page — politique d'autoplay des navigateurs, le visuel reste
+le signal de repli.
+
 ## Entretien périodique
 
 `src/lib/maintenance.ts`, déclenché par `server.ts` au démarrage puis toutes
-les six heures : suppression des sessions périmées et des images qu'aucune
-fiche ne référence plus. Comme le temps réel, ce ménage n'existe pas sous
-`npm run dev:next` — l'application fonctionne, elle accumule.
+les six heures : suppression des sessions périmées, des images qu'aucune fiche
+ne référence plus, et bascule des mandats, BOLO et licences arrivés à
+échéance. Comme le temps réel, ce ménage n'existe pas sous `npm run dev:next`
+— l'application fonctionne, elle accumule.
+
+**Expiration : deux déclencheurs, une seule définition.**
+`expireStaleRecords(prisma)` vit dans `maintenance.ts` ; `src/lib/expiry.ts`
+en est la façade appelée au rendu (expiration paresseuse), pour qu'une page
+n'affiche jamais un mandat ou une licence périmés comme valides. Toute page
+qui montre un de ces enregistrements comme actif doit appeler
+`expireStaleRecords()` — liste des mandats, liste des BOLO, fiche citoyen. En
+plus du balayage, filtrer aussi en lecture (`expiresAt` nul ou futur) : la
+correction de données et la correction d'affichage sont complémentaires.
 
 Le module reçoit son client Prisma en paramètre et ne porte pas `server-only`,
 parce que `server.ts` tourne en Node simple, hors runtime React : ce marqueur
@@ -140,6 +177,47 @@ formulaire qui le recevra.
 `src/lib/audit.ts`. À appeler aussi sur les simples consultations
 (`citizen.view`), pas seulement les mutations — c'est ce qui permet
 d'arbitrer un litige sur un dossier consulté sans motif.
+
+## Modifier un rapport
+
+`assertCanEditReport(actor, reportId)` dans `src/lib/reports.ts` : auteur avec
+`reports.edit`, ou `reports.edit_any` ; un rapport `APPROVED` est verrouillé
+pour tout le monde sauf `reports.edit_any`. Cette garde vaut pour **toute**
+écriture sur un rapport, y compris depuis un autre module — le volet médical
+d'une intervention (`saveEmsDetail`) est une modification de rapport comme une
+autre. La permission de domaine (`medical.reports.create`) dit qu'on a le
+droit de rédiger, pas qu'on a le droit de réécrire le rapport d'un collègue.
+
+## Tests
+
+`npm test` — vitest, environnement Node, aucun accès base. Les tests vivent à
+côté du module qu'ils couvrent (`src/lib/*.test.ts`) et portent sur les
+invariants qu'une modification innocente casse : `can()` / `assertCan()` (dont
+« une seule adhésion, jamais l'union » et le cloisonnement `restrictedTo`),
+`clientIp()` (dernière entrée de `x-forwarded-for`), la limitation de débit,
+les règles d'envoi de fichiers, la cohérence du catalogue de permissions et le
+balayage d'expiration.
+
+Deux détails d'outillage :
+
+- `vitest.config.ts` remplace `server-only` par un module vide
+  (`src/test/server-only-stub.ts`). Sans cela, tout test touchant `auth.ts` ou
+  `rate-limit.ts` échouerait à l'import — c'est le rôle du vrai module de
+  lever une erreur hors bundle serveur.
+- Les modules qui lisent le contexte de requête (`next/headers`) se testent en
+  remplaçant ce module par `vi.mock`, pas en montant un serveur.
+
+Le test de cohérence du catalogue échoue si une permission déclarée n'est
+citée nulle part dans `src/` : `KNOWN_UNWIRED` (dans
+`src/lib/permissions.test.ts`) recense les exceptions connues, et cette liste
+doit se vider, pas s'allonger.
+
+CI : `.github/workflows/ci.yml` — `prisma generate`, lint, typecheck, tests,
+sur chaque poussée et chaque pull request.
+
+Il n'y a pas encore de tests d'intégration sur base jetable (barème figé,
+workflow de rapport, autorisation par server action) ni de fumée HTTP : c'est
+la suite prévue par l'issue #27.
 
 ## Charges : barème figé
 

@@ -27,7 +27,41 @@ const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 export type MaintenanceReport = {
   expiredSessions: number;
   orphanUploads: number;
+  expiredDocuments: number;
 };
+
+/**
+ * Bascule les mandats, BOLO et licences arrivés à échéance.
+ *
+ * Cette fonction est le cœur de l'expiration : `src/lib/expiry.ts` l'appelle
+ * au moment où une page affiche un de ces enregistrements comme actif
+ * (expiration paresseuse), et `runMaintenance()` la rejoue toutes les six
+ * heures pour que la base converge même sans visite. Les deux chemins sont
+ * complémentaires : le premier garantit qu'un écran n'affiche jamais une
+ * donnée périmée, le second qu'une donnée périmée ne survit pas en base parce
+ * que personne n'est passé.
+ *
+ * Elle prend son client en paramètre, comme le reste du module : `server.ts`
+ * tourne hors runtime React et a le sien.
+ */
+export async function expireStaleRecords(prisma: PrismaClient): Promise<number> {
+  const now = new Date();
+  const [warrants, bolos, licenses] = await Promise.all([
+    prisma.warrant.updateMany({
+      where: { status: { in: ["PENDING", "ACTIVE"] }, expiresAt: { not: null, lt: now } },
+      data: { status: "EXPIRED" },
+    }),
+    prisma.bolo.updateMany({
+      where: { isActive: true, expiresAt: { not: null, lt: now } },
+      data: { isActive: false },
+    }),
+    prisma.license.updateMany({
+      where: { status: "VALID", expiresAt: { not: null, lt: now } },
+      data: { status: "EXPIRED" },
+    }),
+  ]);
+  return warrants.count + bolos.count + licenses.count;
+}
 
 /**
  * Supprime les sessions arrivées à échéance.
@@ -118,9 +152,10 @@ export async function purgeOrphanUploads(prisma: PrismaClient): Promise<number> 
 }
 
 export async function runMaintenance(prisma: PrismaClient): Promise<MaintenanceReport> {
-  const [expiredSessions, orphanUploads] = await Promise.all([
+  const [expiredSessions, orphanUploads, expiredDocuments] = await Promise.all([
     purgeExpiredSessions(prisma),
     purgeOrphanUploads(prisma),
+    expireStaleRecords(prisma),
   ]);
-  return { expiredSessions, orphanUploads };
+  return { expiredSessions, orphanUploads, expiredDocuments };
 }
