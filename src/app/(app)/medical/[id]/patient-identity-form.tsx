@@ -16,6 +16,7 @@ const initialState: FormState = {};
 export function PatientIdentityCard({
   patient,
   canEdit,
+  isPoliceFile = false,
 }: {
   patient: {
     id: string;
@@ -30,6 +31,13 @@ export function PatientIdentityCard({
     weight: number | null;
   };
   canEdit: boolean;
+  /**
+   * Vrai quand la fiche vient du fichier police : l'identité y est tenue par
+   * le module citoyens, le module médical ne fait que la lire. Le serveur
+   * refuse la modification de toute façon — l'indiquer ici évite de proposer
+   * un bouton qui ne peut qu'échouer.
+   */
+  isPoliceFile?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateEmsPatientIdentity, initialState);
   const [editing, setEditing] = useState(false);
@@ -62,6 +70,11 @@ export function PatientIdentityCard({
         <div>
           <p className="eyebrow">Profil patient</p>
           <CardTitle className="mt-1">Identité et contact</CardTitle>
+          {isPoliceFile ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Fiche du fichier police : l&apos;identité y est tenue par le module citoyens.
+            </p>
+          ) : null}
         </div>
         {canEdit ? (
           <CardAction>

@@ -11,8 +11,10 @@ import { logout } from "@/app/actions";
 import { clearAllDrafts } from "@/lib/draft-storage";
 import { useActor } from "./actor-provider";
 import { GlobalSearch } from "./global-search";
+import { PanicButton } from "./panic-button";
 
 export type UnitStatusInfo = {
+  id: string;
   callsign: string;
   status: string;
   callNumber: number | null;
@@ -84,6 +86,10 @@ export function AppNav({ unit }: { unit: UnitStatusInfo | null }) {
             <span>{UNIT_STATUS_LABELS[unit.status] ?? unit.status}</span>
           </span>
         ) : null}
+        {/* Le 10-99 se déclenche depuis toutes les pages, pas seulement le
+            tableau de dispatch : c'est le seul bouton qui doit toujours être
+            à portée de clic. */}
+        {unit ? <PanicButton unitId={unit.id} isPanicking={isPanic} /> : null}
       </div>
 
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">

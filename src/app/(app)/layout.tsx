@@ -4,14 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { ActorProvider, type ClientActor } from "@/components/actor-provider";
 import { AppNav, type UnitStatusInfo } from "@/components/app-nav";
 import { AnnouncementBanner, type BannerAnnouncement } from "@/components/announcement-banner";
+import { PanicAlert, type PanicUnit } from "@/components/panic-alert";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor();
   if (!actor) redirect("/connexion");
   if (actor.mustChangePassword) redirect("/changer-mot-de-passe");
 
+  const seesDispatch = can(actor, "dispatch.view");
+
   // Unité de l'agent, pour la barre de statut façon console radio.
-  const unitMembership = can(actor, "dispatch.view")
+  const unitMembership = seesDispatch
     ? await prisma.unitMember.findFirst({
         where: { userId: actor.id },
         include: {
@@ -21,6 +24,34 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         },
       })
     : null;
+
+  /**
+   * Toutes les unités en 10-99, pas seulement la sienne : c'est tout l'objet
+   * du bandeau. Chargé ici, dans le gabarit, pour couvrir tous les modules —
+   * un agent en danger ne doit pas dépendre de l'onglet que ses collègues ont
+   * laissé ouvert.
+   */
+  const panicUnits = seesDispatch
+    ? await prisma.unit.findMany({
+        where: { status: "PANIC", isActive: true },
+        include: {
+          members: { include: { user: { select: { firstName: true, lastName: true } } } },
+          calls: {
+            include: { call: { select: { number: true, code: true, location: true } } },
+            take: 1,
+          },
+        },
+      })
+    : [];
+
+  const panics: PanicUnit[] = panicUnits.map((unit) => ({
+    unitId: unit.id,
+    callsign: unit.callsign,
+    officers: unit.members.map((member) => `${member.user.firstName} ${member.user.lastName}`),
+    callNumber: unit.calls[0]?.call.number ?? null,
+    callCode: unit.calls[0]?.call.code ?? null,
+    callLocation: unit.calls[0]?.call.location ?? null,
+  }));
 
   /**
    * Annonces épinglées destinées à cet agent. Un super-admin les voit toutes,
@@ -51,6 +82,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const unitInfo: UnitStatusInfo | null = unitMembership
     ? {
+        id: unitMembership.unit.id,
         callsign: unitMembership.unit.callsign,
         status: unitMembership.unit.status,
         callNumber: unitMembership.unit.calls[0]?.call.number ?? null,
@@ -85,6 +117,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           aria-hidden
         />
         <AppNav unit={unitInfo} />
+        {/* Le 10-99 passe avant les annonces : c'est la seule chose qui prime. */}
+        <PanicAlert panics={panics} />
         <AnnouncementBanner announcements={bannerAnnouncements} />
         <main className="relative z-10 min-w-0 flex-1 px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
           <div className="page-shell">{children}</div>

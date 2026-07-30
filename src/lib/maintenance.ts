@@ -27,7 +27,57 @@ const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 export type MaintenanceReport = {
   expiredSessions: number;
   orphanUploads: number;
+  expiredDocuments: number;
+  oldLoginAttempts: number;
 };
+
+/**
+ * Rétention des tentatives de connexion : bien plus large que la fenêtre de
+ * quinze minutes de la limitation de débit, parce que la table sert aussi
+ * d'historique consultable. « 40 échecs sur ce compte la semaine dernière »
+ * a une valeur que quinze minutes n'ont pas.
+ */
+const LOGIN_ATTEMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function purgeOldLoginAttempts(prisma: PrismaClient): Promise<number> {
+  const { count } = await prisma.loginAttempt.deleteMany({
+    where: { createdAt: { lt: new Date(Date.now() - LOGIN_ATTEMPT_RETENTION_MS) } },
+  });
+  return count;
+}
+
+/**
+ * Bascule les mandats, BOLO et licences arrivés à échéance.
+ *
+ * Cette fonction est le cœur de l'expiration : `src/lib/expiry.ts` l'appelle
+ * au moment où une page affiche un de ces enregistrements comme actif
+ * (expiration paresseuse), et `runMaintenance()` la rejoue toutes les six
+ * heures pour que la base converge même sans visite. Les deux chemins sont
+ * complémentaires : le premier garantit qu'un écran n'affiche jamais une
+ * donnée périmée, le second qu'une donnée périmée ne survit pas en base parce
+ * que personne n'est passé.
+ *
+ * Elle prend son client en paramètre, comme le reste du module : `server.ts`
+ * tourne hors runtime React et a le sien.
+ */
+export async function expireStaleRecords(prisma: PrismaClient): Promise<number> {
+  const now = new Date();
+  const [warrants, bolos, licenses] = await Promise.all([
+    prisma.warrant.updateMany({
+      where: { status: { in: ["PENDING", "ACTIVE"] }, expiresAt: { not: null, lt: now } },
+      data: { status: "EXPIRED" },
+    }),
+    prisma.bolo.updateMany({
+      where: { isActive: true, expiresAt: { not: null, lt: now } },
+      data: { isActive: false },
+    }),
+    prisma.license.updateMany({
+      where: { status: "VALID", expiresAt: { not: null, lt: now } },
+      data: { status: "EXPIRED" },
+    }),
+  ]);
+  return warrants.count + bolos.count + licenses.count;
+}
 
 /**
  * Supprime les sessions arrivées à échéance.
@@ -118,9 +168,11 @@ export async function purgeOrphanUploads(prisma: PrismaClient): Promise<number> 
 }
 
 export async function runMaintenance(prisma: PrismaClient): Promise<MaintenanceReport> {
-  const [expiredSessions, orphanUploads] = await Promise.all([
+  const [expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts] = await Promise.all([
     purgeExpiredSessions(prisma),
     purgeOrphanUploads(prisma),
+    expireStaleRecords(prisma),
+    purgeOldLoginAttempts(prisma),
   ]);
-  return { expiredSessions, orphanUploads };
+  return { expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts };
 }

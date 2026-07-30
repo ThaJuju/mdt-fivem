@@ -86,7 +86,8 @@ export default async function MedicalRecordPage({ params }: { params: Promise<{ 
       </section>
 
       <PatientIdentityCard
-        canEdit={canEdit}
+        canEdit={canEdit && citizen.isMedicalOnly}
+        isPoliceFile={!citizen.isMedicalOnly}
         patient={{
           id: citizen.id,
           firstName: citizen.firstName,

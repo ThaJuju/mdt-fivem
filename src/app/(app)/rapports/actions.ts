@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireActor, assertCan, can, type Actor } from "@/lib/auth";
+import { requireActor, assertCan, can } from "@/lib/auth";
+import { assertCanEditReport } from "@/lib/reports";
 import { audit } from "@/lib/audit";
 import { ActionError } from "@/lib/errors";
 import { isSafeUploadName } from "@/lib/uploads";
@@ -23,32 +24,6 @@ export type FormState = {
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
-
-/**
- * Un rapport n'est modifiable que par son auteur (`reports.edit`) ou par
- * quelqu'un disposant de `reports.edit_any`. Un rapport validé est verrouillé
- * pour tout le monde sauf `reports.edit_any`.
- */
-async function assertCanEditReport(actor: Actor, reportId: string) {
-  const report = await prisma.report.findUnique({
-    where: { id: reportId },
-    select: { authorId: true, status: true },
-  });
-  if (!report) throw new ActionError("Ce rapport n'existe pas ou a été supprimé.");
-
-  const isAuthor = report.authorId === actor.id;
-  const canEditAny = can(actor, "reports.edit_any");
-
-  if (!canEditAny) {
-    if (!isAuthor || !can(actor, "reports.edit")) {
-      throw new ActionError("Vous ne pouvez modifier que vos propres rapports.");
-    }
-    if (report.status === "APPROVED") {
-      throw new ActionError("Ce rapport est validé : il ne peut plus être modifié.");
-    }
-  }
-  return report;
-}
 
 
 /**

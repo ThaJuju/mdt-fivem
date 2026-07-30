@@ -14,6 +14,26 @@ upstream mdt {
     # en-têtes de confiance posés ici deviennent falsifiables.
     server 127.0.0.1:3000;
     keepalive 32;
+
+    # ─────────────────────────────────────────────────────────────────────
+    # UNE SEULE INSTANCE. Ajouter un second `server` ici casse deux choses,
+    # silencieusement — l'application démarrera et paraîtra fonctionner :
+    #
+    #   1. La limitation de débit (`src/lib/rate-limit.ts`) compte dans une
+    #      Map de processus. Deux instances = quotas doublés dans la fenêtre
+    #      courante. La table `LoginAttempt` amortit le redémarrage, pas le
+    #      partage : elle réamorce un compteur froid, elle ne synchronise pas
+    #      deux compteurs chauds.
+    #   2. Le dispatch temps réel (`src/lib/realtime.ts`) diffuse via
+    #      `globalThis.__mdtIo`, l'instance Socket.io du processus. Un agent
+    #      connecté à l'instance A ne recevrait ni les mises à jour du
+    #      dispatch ni les 10-99 déclenchés depuis l'instance B — et c'est le
+    #      10-99 qui rend cette panne inacceptable.
+    #
+    # Passer réellement à plusieurs instances suppose donc un compteur partagé
+    # (Redis) *et* un adaptateur Socket.io partagé. Tant que le MDT tient sur
+    # un serveur, ne pas payer cette complexité.
+    # ─────────────────────────────────────────────────────────────────────
 }
 
 server {

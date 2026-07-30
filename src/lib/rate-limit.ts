@@ -113,6 +113,37 @@ export function consumeRateLimit(key: string, rule: RateLimitRule, weight = 1): 
 }
 
 /**
+ * La clé est-elle déjà suivie en mémoire ?
+ *
+ * Sert à décider s'il faut aller chercher la mémoire longue en base : une clé
+ * connue du processus n'a rien à y gagner, et c'est ce qui permet à la `Map`
+ * de rester le premier étage — elle absorbe les rafales sans une requête par
+ * tentative.
+ */
+export function hasRateLimitKey(key: string): boolean {
+  return hits.has(key);
+}
+
+/**
+ * Réamorce une clé à partir d'horodatages retrouvés ailleurs (typiquement la
+ * table `LoginAttempt`), pour que les compteurs survivent à un redémarrage.
+ *
+ * **Ne fait rien si la clé est déjà suivie** : le compteur en mémoire est
+ * toujours plus à jour que ce qu'on relit, et l'écraser reviendrait à effacer
+ * les tentatives de la minute écoulée. Retourne `true` si l'amorçage a eu
+ * lieu.
+ */
+export function seedRateLimit(key: string, timestamps: number[], rule: RateLimitRule): boolean {
+  if (hits.has(key)) return false;
+  const now = Date.now();
+  const kept = timestamps.filter((timestamp) => now - timestamp < rule.windowMs).sort((a, b) => a - b);
+  if (kept.length === 0) return false;
+  hits.set(key, kept);
+  evictOldest();
+  return true;
+}
+
+/**
  * Efface le compteur d'une clé. Appelé après une authentification réussie :
  * les échecs qui précèdent ne doivent pas pénaliser quelqu'un qui a fini par
  * retrouver son mot de passe.
