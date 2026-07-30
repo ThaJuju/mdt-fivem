@@ -212,6 +212,18 @@ d'une intervention (`saveEmsDetail`) est une modification de rapport comme une
 autre. La permission de domaine (`medical.reports.create`) dit qu'on a le
 droit de rédiger, pas qu'on a le droit de réécrire le rapport d'un collègue.
 
+**Autoriser sur un rapport, agir sur ses lignes : les deux identifiants
+viennent du même formulaire.** `assertCanEditReport()` autorise sur le
+`reportId` annoncé ; l'identifiant de la charge, de la personne impliquée, de
+l'agent ou de la pièce jointe arrive du même `FormData`. Toute mutation d'une
+ligne rattachée à un rapport doit donc être **bornée à ce rapport** —
+`deleteMany({ where: { id, reportId } })`, ou une relecture par `findFirst`
+avec les deux champs. Sans cette borne il suffisait d'annoncer son propre
+brouillon pour effacer la charge d'un rapport validé quelconque : l'autorisation
+portait sur un dossier, l'écriture sur un autre. Le helper `deleteReportChild()`
+de `src/app/(app)/rapports/actions.ts` porte ce motif, et
+`rapports/actions.test.ts` échoue si le `reportId` quitte la clause.
+
 ## Tests
 
 `npm test` — vitest, environnement Node, aucun accès base. Les tests vivent à

@@ -42,6 +42,33 @@ function safeUploadUrls(values: FormDataEntryValue[]): string[] {
   return urls.slice(0, 20);
 }
 
+/**
+ * Supprime une ligne rattachée à un rapport, **en la bornant à ce rapport**.
+ *
+ * `assertCanEditReport()` autorise sur le `reportId` que le formulaire annonce,
+ * mais l'identifiant de la ligne à supprimer vient du même formulaire : sans
+ * cette borne, il suffisait d'annoncer un rapport qu'on a le droit de modifier
+ * — son propre brouillon — et de désigner la charge, la personne impliquée ou
+ * la pièce jointe d'un rapport quelconque, y compris validé. Les deux
+ * identifiants doivent désigner le même dossier, et c'est à la requête de le
+ * vérifier, pas à l'appelant.
+ *
+ * `deleteMany` plutôt que `delete` : la clause étendue est ici non unique, et
+ * un compte à zéro se traduit en message français au lieu d'un P2025 en 500.
+ */
+async function deleteReportChild(
+  model: {
+    deleteMany: (args: { where: { id: string; reportId: string } }) => Promise<{ count: number }>;
+  },
+  id: string,
+  reportId: string,
+): Promise<boolean> {
+  const { count } = await model.deleteMany({ where: { id, reportId } });
+  return count > 0;
+}
+
+const NOT_IN_THIS_REPORT = "Cet élément n'appartient pas à ce rapport, ou a déjà été supprimé.";
+
 export async function createReport(_prevState: FormState, formData: FormData): Promise<FormState> {
   try {
     const actor = await requireActor();
@@ -279,7 +306,12 @@ export async function removeInvolvement(_prevState: FormState, formData: FormDat
     const reportId = String(formData.get("reportId"));
     await assertCanEditReport(actor, reportId);
 
-    await prisma.reportInvolvement.delete({ where: { id: String(formData.get("involvementId")) } });
+    const removed = await deleteReportChild(
+      prisma.reportInvolvement,
+      String(formData.get("involvementId")),
+      reportId,
+    );
+    if (!removed) return { error: NOT_IN_THIS_REPORT };
     await audit(actor, "report.involvement.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};
@@ -331,7 +363,12 @@ export async function removeOfficer(_prevState: FormState, formData: FormData): 
     const reportId = String(formData.get("reportId"));
     await assertCanEditReport(actor, reportId);
 
-    await prisma.reportOfficer.delete({ where: { id: String(formData.get("officerId")) } });
+    const removed = await deleteReportChild(
+      prisma.reportOfficer,
+      String(formData.get("officerId")),
+      reportId,
+    );
+    if (!removed) return { error: NOT_IN_THIS_REPORT };
     await audit(actor, "report.officer.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};
@@ -372,7 +409,12 @@ export async function removeReportVehicle(_prevState: FormState, formData: FormD
     const reportId = String(formData.get("reportId"));
     await assertCanEditReport(actor, reportId);
 
-    await prisma.reportVehicle.delete({ where: { id: String(formData.get("reportVehicleId")) } });
+    const removed = await deleteReportChild(
+      prisma.reportVehicle,
+      String(formData.get("reportVehicleId")),
+      reportId,
+    );
+    if (!removed) return { error: NOT_IN_THIS_REPORT };
     await audit(actor, "report.vehicle.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};
@@ -417,7 +459,12 @@ export async function removeEvidence(_prevState: FormState, formData: FormData):
     const reportId = String(formData.get("reportId"));
     await assertCanEditReport(actor, reportId);
 
-    await prisma.evidence.delete({ where: { id: String(formData.get("evidenceId")) } });
+    const removed = await deleteReportChild(
+      prisma.evidence,
+      String(formData.get("evidenceId")),
+      reportId,
+    );
+    if (!removed) return { error: NOT_IN_THIS_REPORT };
     await audit(actor, "report.evidence.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};
@@ -497,11 +544,13 @@ export async function updateCharge(_prevState: FormState, formData: FormData): P
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
-    const existingCharge = await prisma.charge.findUnique({
-      where: { id: parsed.data.id },
+    // La charge doit appartenir au rapport sur lequel l'autorisation a été
+    // accordée : voir `deleteReportChild()`.
+    const existingCharge = await prisma.charge.findFirst({
+      where: { id: parsed.data.id, reportId },
       select: { isPaid: true },
     });
-    if (!existingCharge) return { error: "Cette charge n'existe plus." };
+    if (!existingCharge) return { error: NOT_IN_THIS_REPORT };
     if (existingCharge.isPaid) {
       return { error: "Une amende encaissée ne peut plus être modifiée." };
     }
@@ -531,10 +580,15 @@ export async function removeCharge(_prevState: FormState, formData: FormData): P
     await assertCanEditReport(actor, reportId);
 
     const chargeId = String(formData.get("chargeId"));
-    const charge = await prisma.charge.findUnique({ where: { id: chargeId }, select: { isPaid: true } });
-    if (!charge) return { error: "Cette charge n'existe plus." };
+    const charge = await prisma.charge.findFirst({
+      where: { id: chargeId, reportId },
+      select: { isPaid: true },
+    });
+    if (!charge) return { error: NOT_IN_THIS_REPORT };
     if (charge.isPaid) return { error: "Une amende encaissée ne peut plus être supprimée." };
-    await prisma.charge.delete({ where: { id: chargeId } });
+    if (!(await deleteReportChild(prisma.charge, chargeId, reportId))) {
+      return { error: NOT_IN_THIS_REPORT };
+    }
     await audit(actor, "charge.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};

@@ -404,6 +404,17 @@ export async function assignUnit(_prevState: FormState, formData: FormData): Pro
     if (!actor.isSuperAdmin && current && !call.departmentIds.includes(current.departmentId)) {
       return { error: "Votre service n'est pas concerné par cet appel." };
     }
+    /**
+     * On commande les unités de son propre service, pas celles du voisin —
+     * même contrôle qu'à la désaffectation, qui le faisait déjà. Sur un appel
+     * qui concerne deux services (la migration de reprise en a créé, en
+     * agrégeant les services des unités déjà engagées), les deux conditions
+     * ci-dessus laissaient un dispatcheur police mettre une ambulance en
+     * route ; `unassignUnit` refusait ensuite de l'en sortir.
+     */
+    if (!actor.isSuperAdmin && unit.departmentId !== current?.departmentId) {
+      return { error: "Vous ne pouvez pas engager une unité d'un autre service." };
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.callUnit.create({ data: { callId: parsed.data.callId, unitId: parsed.data.unitId } });
