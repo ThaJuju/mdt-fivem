@@ -37,6 +37,7 @@ const POLICE_TIERS = cumulative([
     "citizens.view",
     "citizens.notes.create",
     "vehicles.view",
+    "properties.view",
     "weapons.view",
     "reports.view",
     "reports.create",
@@ -53,6 +54,8 @@ const POLICE_TIERS = cumulative([
     "citizens.edit",
     "vehicles.create",
     "vehicles.edit",
+    "properties.create",
+    "properties.edit",
     "vehicles.flag_stolen",
     "weapons.manage",
     "charges.manage",
@@ -72,6 +75,7 @@ const POLICE_TIERS = cumulative([
   [
     "citizens.delete",
     "vehicles.delete",
+    "properties.delete",
     "reports.approve",
     "warrants.approve",
     "dispatch.units.assign",
@@ -314,6 +318,17 @@ async function main() {
           permissions: grade.permissions,
           isDefault: grade.isDefault ?? false,
         },
+      });
+    }
+
+    const unitTypeNames = dept.type === DepartmentType.EMS
+      ? ["Ambulance", "VSAV", "SMUR"]
+      : ["Patrouille", "K9", "SWAT"];
+    for (const [index, name] of unitTypeNames.entries()) {
+      await prisma.unitType.upsert({
+        where: { departmentId_name: { departmentId: department.id, name } },
+        update: { isActive: true, order: (index + 1) * 10 },
+        create: { departmentId: department.id, name, order: (index + 1) * 10 },
       });
     }
   }

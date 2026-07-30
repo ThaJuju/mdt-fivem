@@ -16,6 +16,7 @@ import {
   Ambulance,
   MessagesSquare,
   BadgeDollarSign,
+  Building2,
 } from "lucide-react";
 
 export type NavScope = "SHARED" | "POLICE" | "EMS" | "ADMIN";
@@ -39,6 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/citoyens", label: "Citoyens", icon: Users, scope: "POLICE", permission: "citizens.view" },
   { href: "/vehicules", label: "Véhicules", icon: Car, scope: "POLICE", permission: "vehicles.view" },
   { href: "/armes", label: "Armes", icon: Crosshair, scope: "POLICE", permission: "weapons.view" },
+  { href: "/proprietes", label: "Propriétés", icon: Building2, scope: "POLICE", permission: "properties.view" },
   { href: "/code-penal", label: "Code pénal", icon: Scale, scope: "POLICE", permission: "penalcode.view" },
   { href: "/mandats", label: "Mandats", icon: Gavel, scope: "POLICE", permission: "warrants.view" },
   { href: "/bolos", label: "BOLO", icon: Megaphone, scope: "POLICE", permission: "bolos.view" },

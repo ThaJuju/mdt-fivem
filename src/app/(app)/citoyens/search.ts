@@ -10,7 +10,10 @@ export type CitizenSearchResult = {
 };
 
 /** Recherche légère pour les sélecteurs de citoyens et de patients. */
-export async function searchCitizens(query: string): Promise<CitizenSearchResult[]> {
+export async function searchCitizens(
+  query: string,
+  scope: "accessible" | "civil" | "medical" = "accessible",
+): Promise<CitizenSearchResult[]> {
   const actor = await requireActor();
   const hasMedicalAccess = can(actor, "medical.view");
   if (!can(actor, "citizens.view") && !hasMedicalAccess) return [];
@@ -19,7 +22,13 @@ export async function searchCitizens(query: string): Promise<CitizenSearchResult
 
   const citizens = await prisma.citizen.findMany({
     where: {
-      ...(hasMedicalAccess ? {} : { isMedicalOnly: false }),
+      ...(scope === "civil"
+        ? { isMedicalOnly: false }
+        : scope === "medical"
+          ? { isMedicalOnly: true }
+          : hasMedicalAccess
+            ? {}
+            : { isMedicalOnly: false }),
       // On ne rattache pas un nouveau dossier à une fiche archivée : elle est
       // sortie de la circulation, la proposer dans un sélecteur la ferait
       // revenir par la petite porte.

@@ -18,6 +18,7 @@ export const callSchema = z.object({
   callerName: optionalText,
   callerPhone: optionalText,
   tags: z.array(z.string()).default([]),
+  departmentIds: z.array(z.string()).min(1, "Sélectionnez au moins un service."),
 });
 export type CallInput = z.infer<typeof callSchema>;
 
@@ -39,7 +40,7 @@ export const callLogSchema = z.object({
 export const unitSchema = z.object({
   id: z.string().optional(),
   callsign: z.string().min(1, "Indicatif requis."),
-  type: z.string().min(1, "Type requis."),
+  typeId: z.string().min(1, "Type requis."),
 });
 export type UnitInput = z.infer<typeof unitSchema>;
 
@@ -51,4 +52,8 @@ export const unitStatusSchema = z.object({
 export const assignUnitSchema = z.object({
   callId: z.string().min(1),
   unitId: z.string().min(1, "Unité requise."),
+});
+
+export const unitTypeSchema = z.object({
+  name: z.string().trim().min(1, "Nom requis.").max(80),
 });

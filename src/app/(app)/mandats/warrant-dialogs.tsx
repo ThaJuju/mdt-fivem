@@ -14,7 +14,9 @@ import { requestWarrant, approveWarrant, denyWarrant, executeWarrant, type FormS
 
 const initialState: FormState = {};
 
-export function RequestWarrantDialog() {
+export function RequestWarrantDialog({ properties }: {
+  properties: { id: string; address: string; type: string | null; ownerName: string | null }[];
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(requestWarrant, initialState);
 
@@ -70,8 +72,21 @@ export function RequestWarrantDialog() {
           </div>
 
           <div className="flex flex-col gap-2">
+            <Label htmlFor="propertyId">Bien visé (perquisition)</Label>
+            <select id="propertyId" name="propertyId" defaultValue="" className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">Adresse libre / aucun bien enregistré</option>
+              {properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.address}{property.type ? ` — ${property.type}` : ""}{property.ownerName ? ` (${property.ownerName})` : ""}
+                </option>
+              ))}
+            </select>
+            {state.fieldErrors?.propertyId?.map((m) => <p key={m} className="text-sm text-destructive">{m}</p>)}
+          </div>
+
+          <div className="flex flex-col gap-2">
             <Label htmlFor="address">Adresse (perquisition)</Label>
-            <Input id="address" name="address" />
+            <Input id="address" name="address" placeholder="Utilisée si aucun bien n'est sélectionné" />
           </div>
 
           <div className="flex flex-col gap-2">

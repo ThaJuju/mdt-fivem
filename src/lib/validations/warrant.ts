@@ -16,6 +16,7 @@ export const warrantRequestSchema = z.object({
   citizenId: z.string().min(1, "Citoyen requis."),
   reason: z.string().min(1, "Motif requis."),
   address: optionalText,
+  propertyId: optionalText,
   expiresAt: optionalDate,
   reportId: optionalText,
 });

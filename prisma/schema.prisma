@@ -36,8 +36,8 @@ model User {
   approvedReports   Report[]        @relation("ReportApprover")
   reportAssignments ReportOfficer[]
 
-  authoredNotes CitizenNote[]
-  collectedCharges Charge[] @relation("ChargePaidBy")
+  authoredNotes    CitizenNote[]
+  collectedCharges Charge[]      @relation("ChargePaidBy")
 
   requestedWarrants Warrant[] @relation("WarrantRequestedBy")
   approvedWarrants  Warrant[] @relation("WarrantApprovedBy")
@@ -62,14 +62,14 @@ model User {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
   @@index([userId])
@@ -126,6 +126,8 @@ model Department {
   announcements  Announcement[]
   certifications Certification[]
   shifts         Shift[]
+  units          Unit[]
+  unitTypes      UnitType[]
 
   @@index([isActive])
 }
@@ -180,31 +182,31 @@ model Membership {
 // ─────────────────────────────────────────────────────────────────────────
 
 model Citizen {
-  id          String    @id @default(cuid())
-  firstName   String
-  lastName    String
-  dob         DateTime  @db.Date
-  gender      String
-  height      Int?
-  weight      Int?
-  hairColor   String?
-  eyeColor    String?
-  address     String?
-  postal      String?
-  phone       String?
-  occupation  String?
-  imageUrl    String?
-  fingerprint String?   @unique
-  isMedicalOnly Boolean @default(false)
-  isDeceased  Boolean   @default(false)
-  deceasedAt  DateTime?
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  dob           DateTime  @db.Date
+  gender        String
+  height        Int?
+  weight        Int?
+  hairColor     String?
+  eyeColor      String?
+  address       String?
+  postal        String?
+  phone         String?
+  occupation    String?
+  imageUrl      String?
+  fingerprint   String?   @unique
+  isMedicalOnly Boolean   @default(false)
+  isDeceased    Boolean   @default(false)
+  deceasedAt    DateTime?
   /// Fiche retirée des listes et de la recherche, mais conservée : elle reste
   /// atteignable depuis les rapports, charges et mandats qui la citent. C'est
   /// la bonne primitive quand une fiche ne doit plus circuler sans pour
   /// autant disparaître — une suppression casserait les dossiers.
-  archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   notes              CitizenNote[]
   licenses           License[]
@@ -295,13 +297,15 @@ model Weapon {
 }
 
 model Property {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   address   String
   type      String?
   citizenId String?
-  citizen   Citizen? @relation(fields: [citizenId], references: [id])
+  citizen   Citizen?  @relation(fields: [citizenId], references: [id])
   notes     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  warrants  Warrant[]
 
   @@index([citizenId])
 }
@@ -466,25 +470,25 @@ model Evidence {
 }
 
 model Charge {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   reportId    String
-  report      Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report      Report    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   citizenId   String
-  citizen     Citizen @relation(fields: [citizenId], references: [id])
+  citizen     Citizen   @relation(fields: [citizenId], references: [id])
   offenseId   String
-  offense     Offense @relation(fields: [offenseId], references: [id])
-  count       Int     @default(1)
+  offense     Offense   @relation(fields: [offenseId], references: [id])
+  count       Int       @default(1)
   fine        Int
   bail        Int?
   jailMinutes Int
   points      Int
-  isGuilty    Boolean @default(true)
-  isPaid      Boolean @default(false)
+  isGuilty    Boolean   @default(true)
+  isPaid      Boolean   @default(false)
   paidAt      DateTime?
   paidById    String?
-  paidBy      User?   @relation("ChargePaidBy", fields: [paidById], references: [id])
+  paidBy      User?     @relation("ChargePaidBy", fields: [paidById], references: [id])
   notes       String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([reportId])
   @@index([citizenId])
@@ -517,6 +521,8 @@ model Warrant {
   citizen       Citizen       @relation(fields: [citizenId], references: [id])
   reason        String
   address       String?
+  propertyId    String?
+  property      Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
   status        WarrantStatus @default(PENDING)
   requestedById String
   requestedBy   User          @relation("WarrantRequestedBy", fields: [requestedById], references: [id])
@@ -531,6 +537,7 @@ model Warrant {
 
   @@index([status])
   @@index([citizenId])
+  @@index([propertyId])
 }
 
 enum BoloType {
@@ -637,23 +644,24 @@ enum CallStatus {
 }
 
 model Call {
-  id          String     @id @default(cuid())
-  number      Int        @unique @default(autoincrement())
-  source      CallSource
-  code        String?
-  priority    Int        @default(3)
-  title       String
-  description String?
-  location    String
-  postal      String?
-  callerName  String?
-  callerPhone String?
-  status      CallStatus @default(PENDING)
-  tags        String[]
-  closedAt    DateTime?
-  closeNote   String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id            String     @id @default(cuid())
+  number        Int        @unique @default(autoincrement())
+  source        CallSource
+  code          String?
+  priority      Int        @default(3)
+  title         String
+  description   String?
+  location      String
+  postal        String?
+  callerName    String?
+  callerPhone   String?
+  status        CallStatus @default(PENDING)
+  tags          String[]
+  departmentIds String[]   @default([])
+  closedAt      DateTime?
+  closeNote     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   logs    CallLog[]
   units   CallUnit[]
@@ -684,19 +692,40 @@ enum UnitStatus {
 }
 
 model Unit {
-  id        String     @id @default(cuid())
-  callsign  String
-  type      String
-  status    UnitStatus @default(OFF_DUTY)
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id           String     @id @default(cuid())
+  callsign     String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  typeId       String
+  type         UnitType   @relation(fields: [typeId], references: [id])
+  status       UnitStatus @default(OFF_DUTY)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   members UnitMember[]
   calls   CallUnit[]
 
+  @@unique([departmentId, callsign])
   @@index([status])
   @@index([isActive])
+  @@index([departmentId])
+  @@index([typeId])
+}
+
+model UnitType {
+  id           String     @id @default(cuid())
+  name         String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  isActive     Boolean    @default(true)
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  units        Unit[]
+
+  @@unique([departmentId, name])
+  @@index([departmentId, isActive])
 }
 
 model UnitMember {

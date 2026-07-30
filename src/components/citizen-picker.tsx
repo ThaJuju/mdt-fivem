@@ -20,11 +20,13 @@ export function CitizenPicker({
   defaultValue,
   placeholder = "Aucun propriétaire",
   searchPlaceholder = "Rechercher un citoyen…",
+  scope = "accessible",
 }: {
   name: string;
   defaultValue?: { id: string; label: string };
   placeholder?: string;
   searchPlaceholder?: string;
+  scope?: "accessible" | "civil" | "medical";
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(defaultValue ?? null);
@@ -36,7 +38,7 @@ export function CitizenPicker({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       startTransition(async () => {
-        const found = await searchCitizens(query);
+        const found = await searchCitizens(query, scope);
         setResults(found);
       });
     }, 250);

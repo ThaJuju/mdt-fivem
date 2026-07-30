@@ -2,6 +2,9 @@ export type UnitRow = {
   id: string;
   callsign: string;
   type: string;
+  departmentId: string;
+  departmentName: string;
+  departmentShortName: string;
   status: string;
   members: { userId: string; name: string; isLead: boolean }[];
   assignedCallNumbers: number[];
@@ -21,12 +24,15 @@ export type CallRow = {
   callerPhone: string | null;
   status: string;
   tags: string[];
+  departmentIds: string[];
   createdAt: string;
-  units: { id: string; callsign: string; status: string }[];
+  units: { id: string; callsign: string; status: string; departmentId: string }[];
   logs: { id: string; message: string; authorName: string | null; createdAt: string }[];
 };
 
 export type StatusCodeOption = { code: string; label: string; color: string };
+export type DepartmentOption = { id: string; name: string; shortName: string };
+export type UnitTypeOption = { id: string; name: string };
 
 export const UNIT_STATUS_LABELS: Record<string, string> = {
   AVAILABLE: "Disponible",

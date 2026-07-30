@@ -4,7 +4,7 @@ import { useDispatchSync } from "@/components/use-dispatch-sync";
 import { cn } from "@/lib/utils";
 import { CallsPanel } from "./calls-panel";
 import { UnitsPanel } from "./units-panel";
-import type { CallRow, UnitRow, StatusCodeOption } from "./types";
+import type { CallRow, UnitRow, StatusCodeOption, DepartmentOption, UnitTypeOption } from "./types";
 
 export function DispatchBoard({
   calls,
@@ -16,6 +16,9 @@ export function DispatchBoard({
   canClose,
   canAssign,
   canManageUnits,
+  departments,
+  unitTypes,
+  actorDepartmentId,
 }: {
   calls: CallRow[];
   units: UnitRow[];
@@ -26,6 +29,9 @@ export function DispatchBoard({
   canClose: boolean;
   canAssign: boolean;
   canManageUnits: boolean;
+  departments: DepartmentOption[];
+  unitTypes: UnitTypeOption[];
+  actorDepartmentId: string | null;
 }) {
   const { connected } = useDispatchSync();
 
@@ -47,12 +53,19 @@ export function DispatchBoard({
           calls={calls}
           units={units}
           statusCodes={statusCodes}
+          departments={departments}
           canCreate={canCreate}
           canEdit={canEdit}
           canClose={canClose}
           canAssign={canAssign}
         />
-        <UnitsPanel units={units} actorId={actorId} canManage={canManageUnits} />
+        <UnitsPanel
+          units={units}
+          unitTypes={unitTypes}
+          actorId={actorId}
+          actorDepartmentId={actorDepartmentId}
+          canManage={canManageUnits}
+        />
       </div>
     </div>
   );

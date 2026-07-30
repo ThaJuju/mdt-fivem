@@ -22,13 +22,33 @@ export async function requestWarrant(_prevState: FormState, formData: FormData):
       citizenId: formData.get("citizenId"),
       reason: formData.get("reason"),
       address: formData.get("address") ?? "",
+      propertyId: formData.get("propertyId") ?? "",
       expiresAt: formData.get("expiresAt") ?? "",
       reportId: formData.get("reportId") ?? "",
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
+    const property = parsed.data.type === "SEARCH" && parsed.data.propertyId
+      ? await prisma.property.findUnique({
+          where: { id: parsed.data.propertyId },
+          select: { address: true, citizenId: true },
+        })
+      : null;
+    if (parsed.data.type === "SEARCH" && parsed.data.propertyId && !property) {
+      return { fieldErrors: { propertyId: ["Cette propriété n'existe plus."] } };
+    }
+    if (property?.citizenId && property.citizenId !== parsed.data.citizenId) {
+      return { fieldErrors: { propertyId: ["Cette propriété appartient à un autre citoyen."] } };
+    }
+
     const warrant = await prisma.warrant.create({
-      data: { ...parsed.data, requestedById: actor.id, status: "PENDING" },
+      data: {
+        ...parsed.data,
+        propertyId: parsed.data.type === "SEARCH" ? parsed.data.propertyId : undefined,
+        address: parsed.data.type === "SEARCH" ? (property?.address ?? parsed.data.address) : undefined,
+        requestedById: actor.id,
+        status: "PENDING",
+      },
     });
     await audit(actor, "warrant.request", {
       entity: "Warrant",

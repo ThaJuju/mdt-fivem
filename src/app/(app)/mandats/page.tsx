@@ -53,19 +53,19 @@ export default async function MandatsPage({
     ...(statusFilter ? { status: statusFilter as Prisma.EnumWarrantStatusFilter["equals"] } : {}),
     ...(q
       ? {
-          citizen: {
-            is: {
-              OR: [
-                { firstName: { contains: q, mode: "insensitive" as const } },
-                { lastName: { contains: q, mode: "insensitive" as const } },
-              ],
-            },
-          },
+          OR: [
+            { citizen: { is: { OR: [
+              { firstName: { contains: q, mode: "insensitive" as const } },
+              { lastName: { contains: q, mode: "insensitive" as const } },
+            ] } } },
+            { address: { contains: q, mode: "insensitive" as const } },
+            { property: { is: { address: { contains: q, mode: "insensitive" as const } } } },
+          ],
         }
       : {}),
   };
 
-  const [warrants, total] = await Promise.all([
+  const [warrants, total, properties] = await Promise.all([
     prisma.warrant.findMany({
       where,
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
@@ -75,9 +75,17 @@ export default async function MandatsPage({
         citizen: { select: { id: true, firstName: true, lastName: true } },
         requestedBy: { select: { firstName: true, lastName: true } },
         approvedBy: { select: { firstName: true, lastName: true } },
+        property: { select: { id: true, address: true } },
       },
     }),
     prisma.warrant.count({ where }),
+    can(actor, "warrants.request") && can(actor, "properties.view")
+      ? prisma.property.findMany({
+          orderBy: { address: "asc" },
+          take: 500,
+          include: { citizen: { select: { firstName: true, lastName: true } } },
+        })
+      : [],
   ]);
 
   await audit(actor, "warrant.list");
@@ -89,7 +97,14 @@ export default async function MandatsPage({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Mandats</h1>
-        {can(actor, "warrants.request") ? <RequestWarrantDialog /> : null}
+        {can(actor, "warrants.request") ? (
+          <RequestWarrantDialog properties={properties.map((property) => ({
+            id: property.id,
+            address: property.address,
+            type: property.type,
+            ownerName: property.citizen ? `${property.citizen.lastName} ${property.citizen.firstName}` : null,
+          }))} />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -143,7 +158,9 @@ export default async function MandatsPage({
 
               <p className="text-sm whitespace-pre-wrap">{warrant.reason}</p>
               {warrant.address ? (
-                <p className="text-sm text-muted-foreground">Adresse : {warrant.address}</p>
+                <p className="text-sm text-muted-foreground">Adresse : {warrant.property ? (
+                  <Link href={`/proprietes/${warrant.property.id}`} className="hover:underline">{warrant.property.address}</Link>
+                ) : warrant.address}</p>
               ) : null}
 
               <p className="text-xs text-muted-foreground">

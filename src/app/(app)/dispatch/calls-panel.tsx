@@ -29,11 +29,16 @@ import {
   type CallRow,
   type UnitRow,
   type StatusCodeOption,
+  type DepartmentOption,
 } from "./types";
 
 const initialState: FormState = {};
 
-function NewCallDialog({ statusCodes }: { statusCodes: StatusCodeOption[] }) {
+function NewCallDialog({
+  statusCodes,
+}: {
+  statusCodes: StatusCodeOption[];
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(createCall, initialState);
 
@@ -160,13 +165,23 @@ function NewCallDialog({ statusCodes }: { statusCodes: StatusCodeOption[] }) {
   );
 }
 
-function AssignUnitForm({ callId, units }: { callId: string; units: UnitRow[] }) {
+function AssignUnitForm({
+  callId,
+  units,
+  departmentIds,
+}: {
+  callId: string;
+  units: UnitRow[];
+  departmentIds: string[];
+}) {
   const [state, formAction, isPending] = useActionState(assignUnit, initialState);
   useEffect(() => {
     if (state.error) toast.error(state.error);
   }, [state]);
 
-  const available = units.filter((unit) => unit.status !== "OFF_DUTY");
+  const available = units.filter(
+    (unit) => unit.status !== "OFF_DUTY" && departmentIds.includes(unit.departmentId),
+  );
   if (available.length === 0) return null;
 
   return (
@@ -179,7 +194,7 @@ function AssignUnitForm({ callId, units }: { callId: string; units: UnitRow[] })
         <SelectContent>
           {available.map((unit) => (
             <SelectItem key={unit.id} value={unit.id}>
-              {unit.callsign}
+              {unit.departmentShortName} · {unit.callsign}
             </SelectItem>
           ))}
         </SelectContent>
@@ -300,6 +315,7 @@ export function CallsPanel({
   canEdit,
   canClose,
   canAssign,
+  departments,
 }: {
   calls: CallRow[];
   units: UnitRow[];
@@ -308,6 +324,7 @@ export function CallsPanel({
   canEdit: boolean;
   canClose: boolean;
   canAssign: boolean;
+  departments: DepartmentOption[];
 }) {
   const [openCallId, setOpenCallId] = useState<string | null>(null);
 
@@ -315,7 +332,9 @@ export function CallsPanel({
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-medium">File d&apos;appels</h2>
-        {canCreate ? <NewCallDialog statusCodes={statusCodes} /> : null}
+        {canCreate ? (
+          <NewCallDialog statusCodes={statusCodes} />
+        ) : null}
       </div>
 
       {calls.length === 0 ? (
@@ -343,6 +362,9 @@ export function CallsPanel({
                     {call.code ? <span className="font-mono text-xs">{call.code}</span> : null}
                     <span className="text-sm font-medium text-foreground">{call.title}</span>
                     <Badge variant="outline">{CALL_STATUS_LABELS[call.status] ?? call.status}</Badge>
+                    {departments.filter((department) => call.departmentIds.includes(department.id)).map((department) => (
+                      <Badge key={department.id} variant="secondary">{department.shortName}</Badge>
+                    ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
                     {canEdit ? <CallStatusSelect callId={call.id} status={call.status} /> : null}
@@ -386,7 +408,9 @@ export function CallsPanel({
                       </span>
                     ))
                   )}
-                  {canAssign ? <AssignUnitForm callId={call.id} units={units} /> : null}
+                  {canAssign ? (
+                    <AssignUnitForm callId={call.id} units={units} departmentIds={call.departmentIds} />
+                  ) : null}
                 </div>
 
                 {isOpen ? (

@@ -5,7 +5,7 @@ import { requireActor, can } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type GlobalSearchGroup = {
-  type: "citizens" | "patients" | "vehicles" | "weapons" | "reports" | "warrants" | "bolos" | "agents";
+  type: "citizens" | "patients" | "vehicles" | "weapons" | "properties" | "reports" | "warrants" | "bolos" | "agents";
   label: string;
   allHref: string;
   results: { id: string; href: string; title: string; subtitle: string; isAlert: boolean }[];
@@ -70,7 +70,7 @@ export async function globalSearch(query: string): Promise<GlobalSearchGroup[]> 
     .filter((membership) => membership.status === "ACTIVE")
     .map((membership) => membership.departmentId);
 
-  const [citizens, patients, vehicles, weapons, reports, warrants, bolos, agents] = await Promise.all([
+  const [citizens, patients, vehicles, weapons, properties, reports, warrants, bolos, agents] = await Promise.all([
     can(actor, "citizens.view")
       ? prisma.citizen.findMany({
           where: {
@@ -127,6 +127,14 @@ export async function globalSearch(query: string): Promise<GlobalSearchGroup[]> 
           },
           orderBy: { serialNumber: "asc" },
           take: 5,
+        })
+      : [],
+    can(actor, "properties.view")
+      ? prisma.property.findMany({
+          where: { address: { contains: trimmed, mode: "insensitive" } },
+          orderBy: { address: "asc" },
+          take: 5,
+          include: { citizen: { select: { firstName: true, lastName: true } } },
         })
       : [],
     can(actor, "reports.view")
@@ -242,6 +250,13 @@ export async function globalSearch(query: string): Promise<GlobalSearchGroup[]> 
     type: "weapons", label: "Armes", allHref: `/armes?q=${q}`,
     results: weapons.map((weapon) =>
       result(weapon.id, `/armes/${weapon.id}`, weapon.serialNumber, weapon.model, weapon.isStolen)),
+  });
+  if (properties.length) groups.push({
+    type: "properties", label: "Propriétés", allHref: `/proprietes?q=${q}`,
+    results: properties.map((property) =>
+      result(property.id, `/proprietes/${property.id}`, property.address,
+        [property.type, property.citizen ? `${property.citizen.lastName} ${property.citizen.firstName}` : null]
+          .filter(Boolean).join(" · ") || "Bien enregistré")),
   });
   if (reports.length) groups.push({
     type: "reports", label: "Rapports", allHref: `/rapports?q=${q}`,

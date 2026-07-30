@@ -14,6 +14,7 @@ import {
   unitSchema,
   unitStatusSchema,
   assignUnitSchema,
+  unitTypeSchema,
 } from "@/lib/validations/dispatch";
 
 export type FormState = {
@@ -35,12 +36,19 @@ function parseTags(raw: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+function actorDepartment(actor: Awaited<ReturnType<typeof requireActor>>) {
+  const active = actor.memberships.filter((membership) => membership.status === "ACTIVE");
+  return active.find((membership) => membership.isPrimary) ?? active[0];
+}
+
 // ── Appels ─────────────────────────────────────────────────────────────
 
 export async function createCall(_prevState: FormState, formData: FormData): Promise<FormState> {
   try {
     const actor = await requireActor();
     assertCan(actor, "dispatch.calls.create");
+    const current = actorDepartment(actor);
+    if (!current) return { error: "Aucun service principal actif." };
 
     const parsed = callSchema.safeParse({
       source: formData.get("source"),
@@ -53,8 +61,17 @@ export async function createCall(_prevState: FormState, formData: FormData): Pro
       callerName: formData.get("callerName") ?? "",
       callerPhone: formData.get("callerPhone") ?? "",
       tags: parseTags(formData.get("tags")),
+      // Le service vient exclusivement de la session : le client ne peut ni
+      // choisir ni falsifier le service responsable de l'appel.
+      departmentIds: [current.departmentId],
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+    const allowedDepartment = await prisma.department.findFirst({
+      where: { id: current.departmentId, isActive: true, type: { in: ["POLICE", "EMS"] } },
+      select: { id: true },
+    });
+    if (!allowedDepartment) return { error: "Votre service ne peut pas recevoir d'appels dispatch." };
 
     const { id, ...data } = parsed.data;
     void id;
@@ -195,12 +212,28 @@ export async function createUnit(_prevState: FormState, formData: FormData): Pro
 
     const parsed = unitSchema.safeParse({
       callsign: formData.get("callsign"),
-      type: formData.get("type"),
+      typeId: formData.get("typeId"),
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
 
+    const membership = actorDepartment(actor);
+    if (!membership) return { error: "Aucun service principal actif." };
+    const type = await prisma.unitType.findFirst({
+      where: { id: parsed.data.typeId, departmentId: membership.departmentId, isActive: true },
+    });
+    if (!type) return { fieldErrors: { typeId: ["Ce type n'appartient pas à votre service."] } };
+    const duplicate = await prisma.unit.findUnique({
+      where: { departmentId_callsign: { departmentId: membership.departmentId, callsign: parsed.data.callsign } },
+    });
+    if (duplicate) return { fieldErrors: { callsign: ["Cet indicatif existe déjà dans votre service."] } };
+
     const unit = await prisma.unit.create({
-      data: { callsign: parsed.data.callsign, type: parsed.data.type, status: "AVAILABLE" },
+      data: {
+        callsign: parsed.data.callsign,
+        typeId: type.id,
+        departmentId: membership.departmentId,
+        status: "AVAILABLE",
+      },
     });
     await audit(actor, "unit.create", { entity: "Unit", entityId: unit.id });
     syncDispatch();
@@ -231,9 +264,13 @@ export async function setUnitStatus(_prevState: FormState, formData: FormData): 
 
     const before = await prisma.unit.findUnique({
       where: { id: parsed.data.unitId },
-      select: { status: true },
+      select: { status: true, departmentId: true },
     });
     if (!before) return { error: "Cette unité n'existe plus." };
+    const current = actorDepartment(actor);
+    if (!actor.isSuperAdmin && before.departmentId !== current?.departmentId) {
+      return { error: "Vous ne pouvez pas commander une unité d'un autre service." };
+    }
 
     await prisma.unit.update({ where: { id: parsed.data.unitId }, data: { status: parsed.data.status } });
     await audit(actor, "unit.status", {
@@ -262,6 +299,12 @@ export async function joinUnit(_prevState: FormState, formData: FormData): Promi
     assertCan(actor, "dispatch.view");
 
     const unitId = String(formData.get("unitId"));
+    const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { departmentId: true } });
+    if (!unit) return { error: "Cette unité n'existe plus." };
+    const membership = actorDepartment(actor);
+    if (!membership || unit.departmentId !== membership.departmentId) {
+      return { error: "Vous ne pouvez rejoindre qu'une unité de votre service principal." };
+    }
     const existing = await prisma.unitMember.findUnique({
       where: { unitId_userId: { unitId, userId: actor.id } },
     });
@@ -307,7 +350,15 @@ export async function deleteUnit(_prevState: FormState, formData: FormData): Pro
     assertCan(actor, "dispatch.units.manage");
 
     const unitId = String(formData.get("unitId"));
-    const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { status: true } });
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      select: { status: true, departmentId: true },
+    });
+    const current = actorDepartment(actor);
+    if (!unit) return { error: "Cette unité n'existe plus." };
+    if (!actor.isSuperAdmin && unit.departmentId !== current?.departmentId) {
+      return { error: "Vous ne pouvez pas supprimer une unité d'un autre service." };
+    }
     await prisma.unit.delete({ where: { id: unitId } });
     await audit(actor, "unit.delete", { entity: "Unit", entityId: unitId });
     syncDispatch();
@@ -341,6 +392,18 @@ export async function assignUnit(_prevState: FormState, formData: FormData): Pro
 
     const unit = await prisma.unit.findUnique({ where: { id: parsed.data.unitId } });
     if (!unit) return { error: "Cette unité n'existe plus." };
+    const call = await prisma.call.findUnique({
+      where: { id: parsed.data.callId },
+      select: { departmentIds: true },
+    });
+    if (!call) return { error: "Cet appel n'existe plus." };
+    const current = actorDepartment(actor);
+    if (!call.departmentIds.includes(unit.departmentId)) {
+      return { error: "Le service de cette unité n'est pas concerné par cet appel." };
+    }
+    if (!actor.isSuperAdmin && current && !call.departmentIds.includes(current.departmentId)) {
+      return { error: "Votre service n'est pas concerné par cet appel." };
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.callUnit.create({ data: { callId: parsed.data.callId, unitId: parsed.data.unitId } });
@@ -367,6 +430,54 @@ export async function assignUnit(_prevState: FormState, formData: FormData): Pro
   }
 }
 
+export async function createUnitType(_prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const actor = await requireActor();
+    assertCan(actor, "dispatch.units.manage");
+    const parsed = unitTypeSchema.safeParse({ name: formData.get("name") });
+    if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+    const membership = actorDepartment(actor);
+    if (!membership) return { error: "Aucun service principal actif." };
+    const existing = await prisma.unitType.findUnique({
+      where: { departmentId_name: { departmentId: membership.departmentId, name: parsed.data.name } },
+    });
+    if (existing) return { fieldErrors: { name: ["Ce type existe déjà dans votre service."] } };
+    const type = await prisma.unitType.create({
+      data: { name: parsed.data.name, departmentId: membership.departmentId },
+    });
+    await audit(actor, "unittype.create", { entity: "UnitType", entityId: type.id });
+    syncDispatch();
+    return {};
+  } catch (err) {
+    if (err instanceof ActionError) return { error: err.message };
+    throw err;
+  }
+}
+
+export async function deleteUnitType(_prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const actor = await requireActor();
+    assertCan(actor, "dispatch.units.manage");
+    const id = String(formData.get("typeId"));
+    const membership = actorDepartment(actor);
+    const type = await prisma.unitType.findUnique({
+      where: { id },
+      include: { _count: { select: { units: true } } },
+    });
+    if (!type || (!actor.isSuperAdmin && type.departmentId !== membership?.departmentId)) {
+      return { error: "Ce type n'appartient pas à votre service." };
+    }
+    if (type._count.units > 0) return { error: "Ce type est encore utilisé par une unité." };
+    await prisma.unitType.delete({ where: { id } });
+    await audit(actor, "unittype.delete", { entity: "UnitType", entityId: id });
+    syncDispatch();
+    return {};
+  } catch (err) {
+    if (err instanceof ActionError) return { error: err.message };
+    throw err;
+  }
+}
+
 export async function unassignUnit(_prevState: FormState, formData: FormData): Promise<FormState> {
   try {
     const actor = await requireActor();
@@ -375,6 +486,15 @@ export async function unassignUnit(_prevState: FormState, formData: FormData): P
     const callId = String(formData.get("callId"));
     const unitId = String(formData.get("unitId"));
     const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    const call = await prisma.call.findUnique({ where: { id: callId }, select: { departmentIds: true } });
+    const current = actorDepartment(actor);
+    if (!unit || !call) return { error: "L'appel ou l'unité n'existe plus." };
+    if (!actor.isSuperAdmin && unit.departmentId !== current?.departmentId) {
+      return { error: "Vous ne pouvez pas désengager une unité d'un autre service." };
+    }
+    if (!call.departmentIds.includes(unit.departmentId)) {
+      return { error: "Le service de cette unité n'est pas concerné par cet appel." };
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.callUnit.deleteMany({ where: { callId, unitId } });

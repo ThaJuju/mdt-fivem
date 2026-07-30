@@ -58,6 +58,7 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
         licenses: { orderBy: { issuedAt: "desc" } },
         ownedVehicles: { orderBy: { plate: "asc" } },
         ownedWeapons: { orderBy: { serialNumber: "asc" } },
+        properties: { orderBy: { address: "asc" } },
         // Ceinture et bretelles : le balayage ci-dessus a déjà basculé les
         // mandats échus, cette clause garantit qu'aucun ne remonte comme actif
         // même si l'écriture a échoué.
@@ -284,6 +285,27 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
               )}
             </CardContent>
           </Card>
+
+          {can(actor, "properties.view") ? (
+            <Card>
+              <CardHeader><CardTitle>Biens</CardTitle></CardHeader>
+              <CardContent>
+                {citizen.properties.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucune propriété enregistrée à ce nom.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5">
+                    {citizen.properties.map((property) => (
+                      <li key={property.id}>
+                        <Link href={`/proprietes/${property.id}`} className="text-sm hover:underline">
+                          {property.address}{property.type ? ` — ${property.type}` : ""}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
 

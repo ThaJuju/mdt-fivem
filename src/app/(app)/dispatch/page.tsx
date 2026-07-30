@@ -11,13 +11,16 @@ export default async function DispatchPage() {
   const actor = await requireActor();
   requirePagePermission(actor, "dispatch.view");
 
-  const [calls, units, statusCodes] = await Promise.all([
+  const currentMembership =
+    actor.memberships.find((membership) => membership.status === "ACTIVE" && membership.isPrimary) ??
+    actor.memberships.find((membership) => membership.status === "ACTIVE");
+  const [calls, units, statusCodes, departments, unitTypes] = await Promise.all([
     prisma.call.findMany({
       where: { status: { not: "CLOSED" } },
       orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
       take: 50,
       include: {
-        units: { include: { unit: { select: { id: true, callsign: true, status: true } } } },
+        units: { include: { unit: { select: { id: true, callsign: true, status: true, departmentId: true } } } },
         logs: {
           orderBy: { createdAt: "desc" },
           take: 20,
@@ -27,13 +30,27 @@ export default async function DispatchPage() {
     }),
     prisma.unit.findMany({
       where: { isActive: true },
-      orderBy: { callsign: "asc" },
+      orderBy: [{ department: { order: "asc" } }, { callsign: "asc" }],
       include: {
+        department: { select: { id: true, name: true, shortName: true } },
+        type: { select: { id: true, name: true } },
         members: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
         calls: { include: { call: { select: { number: true } } } },
       },
     }),
     prisma.statusCode.findMany({ orderBy: { order: "asc" } }),
+    prisma.department.findMany({
+      where: { isActive: true, type: { in: ["POLICE", "EMS"] } },
+      orderBy: { order: "asc" },
+      select: { id: true, name: true, shortName: true },
+    }),
+    currentMembership
+      ? prisma.unitType.findMany({
+          where: { departmentId: currentMembership.departmentId, isActive: true },
+          orderBy: [{ order: "asc" }, { name: "asc" }],
+          select: { id: true, name: true },
+        })
+      : [],
   ]);
 
   await audit(actor, "dispatch.view");
@@ -52,11 +69,13 @@ export default async function DispatchPage() {
     callerPhone: call.callerPhone,
     status: call.status,
     tags: call.tags,
+    departmentIds: call.departmentIds,
     createdAt: call.createdAt.toISOString(),
     units: call.units.map((callUnit) => ({
       id: callUnit.unit.id,
       callsign: callUnit.unit.callsign,
       status: callUnit.unit.status,
+      departmentId: callUnit.unit.departmentId,
     })),
     logs: call.logs
       .map((log) => ({
@@ -71,7 +90,10 @@ export default async function DispatchPage() {
   const unitRows: UnitRow[] = units.map((unit) => ({
     id: unit.id,
     callsign: unit.callsign,
-    type: unit.type,
+    type: unit.type.name,
+    departmentId: unit.department.id,
+    departmentName: unit.department.name,
+    departmentShortName: unit.department.shortName,
     status: unit.status,
     members: unit.members.map((member) => ({
       userId: member.user.id,
@@ -86,6 +108,9 @@ export default async function DispatchPage() {
       calls={callRows}
       units={unitRows}
       statusCodes={statusCodes.map((s) => ({ code: s.code, label: s.label, color: s.color }))}
+      departments={departments}
+      unitTypes={unitTypes}
+      actorDepartmentId={currentMembership?.departmentId ?? null}
       actorId={actor.id}
       canCreate={can(actor, "dispatch.calls.create")}
       canEdit={can(actor, "dispatch.calls.edit")}

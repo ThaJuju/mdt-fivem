@@ -75,6 +75,17 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
     ],
   },
   {
+    key: "properties",
+    label: "Propriétés",
+    restrictedTo: ["POLICE"],
+    permissions: [
+      { key: "view", label: "Consulter les propriétés" },
+      { key: "create", label: "Enregistrer une propriété" },
+      { key: "edit", label: "Modifier une propriété" },
+      { key: "delete", label: "Supprimer une propriété" },
+    ],
+  },
+  {
     key: "reports",
     label: "Rapports",
     permissions: [
