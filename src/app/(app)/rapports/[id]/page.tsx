@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { requireActor, requirePagePermission, can } from "@/lib/auth";
+import { requireActor, requirePagePermission, denyPageAccess, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
@@ -81,7 +81,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   // explicite au rapport est la seule passerelle, pour les interventions
   // réellement conjointes Police/EMS.
   if (!actor.isSuperAdmin && report.departmentId !== primary?.departmentId && !wasThere) {
-    requirePagePermission(actor, "__department.report");
+    denyPageAccess("autre-service");
   }
 
   if (!wasThere && !can(actor, "reports.view_all")) {
@@ -92,8 +92,11 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   // l'EMS, ou par ceux qui étaient sur place. Sans ce contrôle, la réserve de
   // `/medical` se contournerait en ouvrant le rapport correspondant.
   const isMedicalReport = report.type === "EMS_INTERVENTION" || report.emsDetail !== null;
-  if (isMedicalReport && !wasThere) {
-    requirePagePermission(actor, "medical.view");
+  if (isMedicalReport && !wasThere && !can(actor, "medical.view")) {
+    // `medical.view` est bien la permission qui ouvre la porte, mais la nommer
+    // dans le refus reviendrait à conseiller à un policier de la réclamer —
+    // alors que le cloisonnement veut précisément qu'il ne l'ait pas.
+    denyPageAccess("secret-medical");
   }
 
   await audit(actor, "report.view", {

@@ -70,6 +70,24 @@ describe("catalogue des permissions", () => {
     const unwired = ALL_PERMISSIONS.filter((permission) => !sources.includes(`"${permission}"`));
     expect(unwired.sort()).toEqual([...KNOWN_UNWIRED].sort());
   });
+
+  /**
+   * La réciproque du test précédent, et celui qui aurait attrapé
+   * `__department.report` : une garde qui cite une permission absente du
+   * catalogue refuse bien — `can()` renvoie faux — mais pour la mauvaise
+   * raison, et l'écran d'accès refusé n'a alors aucun libellé français à
+   * afficher. Un cloisonnement se déclare avec `denyPageAccess()`, pas avec
+   * une fausse permission.
+   */
+  it("n'exerce aucune permission absente du catalogue", () => {
+    const guard = /\b(?:can|assertCan|requirePagePermission)\(\s*[^,()]+,\s*"([^"]+)"/g;
+    const used = new Set<string>();
+    for (const match of sources.matchAll(guard)) used.add(match[1]);
+
+    expect(used.size).toBeGreaterThan(0);
+    const unknown = [...used].filter((permission) => !isValidPermission(permission));
+    expect(unknown.sort()).toEqual([]);
+  });
 });
 
 describe("cloisonnement déclaré dans le catalogue", () => {

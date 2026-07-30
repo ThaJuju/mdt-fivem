@@ -298,6 +298,16 @@ passe que des données sérialisables. Les `columns.tsx` sont marqués
 `requirePagePermission(actor, "…")` : redirige vers `/acces-refuse?p=…` qui
 nomme la permission manquante en français.
 
+**Un refus qui n'est pas une permission manquante s'exprime avec
+`denyPageAccess(motif)`**, pas en passant une permission inventée à
+`requirePagePermission()`. Le cloisonnement d'un dossier par service et le
+secret médical ne se corrigent pas en réclamant un droit à un supérieur : les
+motifs et leurs textes vivent dans `src/lib/access-denied.ts`, et
+`/acces-refuse` les rend sur `?motif=`. `?p=` reste réservé aux permissions
+réelles, et n'affiche que celles que le catalogue reconnaît — une clé technique
+n'a rien à faire sous les yeux d'un agent. Un test de `permissions.test.ts`
+échoue désormais si une garde cite une permission absente du catalogue.
+
 Corollaire général : un `next build` vert ne prouve pas qu'une page s'affiche.
 Vérifier chaque route en HTTP réel avant de considérer une phase terminée.
 

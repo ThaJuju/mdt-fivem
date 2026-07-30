@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { MembershipStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import type { AccessDeniedReason } from "./access-denied";
 import { clientIp, isSecureRequest } from "./client-ip";
 import { ActionError } from "./errors";
 import { domainAllowsDepartment } from "./permissions";
@@ -333,4 +334,17 @@ export function requirePagePermission(actor: Actor, permission: string): void {
   if (!can(actor, permission)) {
     redirect(`/acces-refuse?p=${encodeURIComponent(permission)}`);
   }
+}
+
+/**
+ * Refuse une page pour un motif qui n'est pas une permission manquante :
+ * cloisonnement par service, secret médical.
+ *
+ * À utiliser au lieu de faire passer une fausse permission à
+ * `requirePagePermission()` — l'astuce redirigeait bien, mais nommait à
+ * l'écran une clé technique et conseillait de réclamer un droit inexistant.
+ * `p=` reste réservé aux permissions réelles du catalogue.
+ */
+export function denyPageAccess(reason: AccessDeniedReason): never {
+  redirect(`/acces-refuse?motif=${reason}`);
 }
