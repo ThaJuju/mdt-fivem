@@ -3,8 +3,10 @@ import {
   __resetAllRateLimits,
   consumeRateLimit,
   formatRetryDelay,
+  hasRateLimitKey,
   peekRateLimit,
   resetRateLimit,
+  seedRateLimit,
   type RateLimitRule,
 } from "./rate-limit";
 
@@ -75,6 +77,58 @@ describe("resetRateLimit", () => {
 
     resetRateLimit("agent@1.2.3.4");
     expect(peekRateLimit("agent@1.2.3.4", RULE).ok).toBe(true);
+  });
+});
+
+/**
+ * Second étage : la base sert de mémoire longue et réamorce un compteur que
+ * le processus ne connaît pas encore. Sans cela, redémarrer le serveur rendait
+ * ses cinq tentatives à qui venait de les épuiser.
+ */
+describe("seedRateLimit", () => {
+  it("réamorce une clé inconnue avec des échecs retrouvés ailleurs", () => {
+    expect(hasRateLimitKey("agent@1.2.3.4")).toBe(false);
+    const now = Date.now();
+    const seeded = seedRateLimit(
+      "agent@1.2.3.4",
+      Array.from({ length: RULE.limit }, (_, i) => now - i * 1000),
+      RULE,
+    );
+    expect(seeded).toBe(true);
+    expect(peekRateLimit("agent@1.2.3.4", RULE).ok).toBe(false);
+  });
+
+  it("ne touche pas une clé déjà suivie : la mémoire est plus à jour que la base", () => {
+    consumeRateLimit("agent@1.2.3.4", RULE);
+    const seeded = seedRateLimit("agent@1.2.3.4", [Date.now(), Date.now()], RULE);
+    expect(seeded).toBe(false);
+    // Une seule unité consommée, pas trois : l'amorçage n'a rien ajouté.
+    for (let i = 1; i < RULE.limit; i += 1) {
+      expect(peekRateLimit("agent@1.2.3.4", RULE).ok).toBe(true);
+      consumeRateLimit("agent@1.2.3.4", RULE);
+    }
+    expect(peekRateLimit("agent@1.2.3.4", RULE).ok).toBe(false);
+  });
+
+  it("ignore les horodatages sortis de la fenêtre", () => {
+    const old = Date.now() - RULE.windowMs - 1000;
+    expect(seedRateLimit("agent@1.2.3.4", [old, old, old, old, old, old], RULE)).toBe(false);
+    expect(peekRateLimit("agent@1.2.3.4", RULE).ok).toBe(true);
+  });
+
+  it("n'amorce rien quand il n'y a aucun échec à reprendre", () => {
+    expect(seedRateLimit("agent@1.2.3.4", [], RULE)).toBe(false);
+    expect(hasRateLimitKey("agent@1.2.3.4")).toBe(false);
+  });
+});
+
+describe("hasRateLimitKey", () => {
+  it("dit si le processus suit déjà la clé, pour éviter une requête inutile", () => {
+    expect(hasRateLimitKey("agent@1.2.3.4")).toBe(false);
+    consumeRateLimit("agent@1.2.3.4", RULE);
+    expect(hasRateLimitKey("agent@1.2.3.4")).toBe(true);
+    resetRateLimit("agent@1.2.3.4");
+    expect(hasRateLimitKey("agent@1.2.3.4")).toBe(false);
   });
 });
 

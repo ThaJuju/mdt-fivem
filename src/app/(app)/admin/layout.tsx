@@ -6,6 +6,7 @@ const ADMIN_SECTIONS = [
   { href: "/admin/departements", label: "Départements & grades", permission: "admin.departments.manage" },
   { href: "/admin/codes", label: "10-codes", permission: "admin.codes.manage" },
   { href: "/admin/audit", label: "Journal d'audit", permission: "admin.audit.view" },
+  { href: "/admin/connexions", label: "Connexions", permission: "admin.audit.view" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

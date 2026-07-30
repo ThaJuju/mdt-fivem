@@ -87,12 +87,35 @@ appellent `revokeAllSessions()` — l'admin agit sur un autre compte que le
 sien, il n'y a rien à épargner.
 
 La connexion est limitée par `src/lib/rate-limit.ts` (fenêtre glissante **en
-mémoire**, donc par processus : à réécrire le jour où l'application tourne en
-plusieurs instances). Trois compteurs superposés — identifiant+adresse (5),
-adresse (20), identifiant seul (30) sur 15 minutes. Le premier est volontaire :
-bloquer sur l'identifiant seul permettrait à n'importe qui de verrouiller le
-compte d'un agent en cinq essais. Seuls les échecs comptent, un succès remet
-tout à zéro. L'envoi d'images a son propre quota, facturé au mégaoctet.
+mémoire**, donc par processus). Trois compteurs superposés —
+identifiant+adresse (5), adresse (20), identifiant seul (30) sur 15 minutes. Le
+premier est volontaire : bloquer sur l'identifiant seul permettrait à n'importe
+qui de verrouiller le compte d'un agent en cinq essais. Seuls les échecs
+comptent, un succès remet tout à zéro. L'envoi d'images a son propre quota,
+facturé au mégaoctet.
+
+**Deux étages, et un seul processus.** La `Map` reste le premier étage : elle
+absorbe les rafales sans une requête par tentative — compter les essais refusés
+dans PostgreSQL ferait de la protection elle-même le vecteur d'attaque. La
+table `LoginAttempt` (`src/lib/login-attempts.ts`) est la mémoire longue :
+
+- au premier passage sur une clé que le processus ne connaît pas,
+  `hydrateLoginCounters()` relit les échecs encore comptables et réamorce le
+  compteur. Sans cela, un redémarrage — ou un simple déploiement — rendait ses
+  cinq tentatives à qui venait de les épuiser. Une seule requête, et plus
+  aucune dès la deuxième tentative ;
+- la règle « un succès remet tout à zéro » vaut aussi à la relecture : seuls
+  les échecs postérieurs à la dernière réussite sont repris ;
+- une base indisponible ne verrouille personne — on retombe sur le compteur
+  mémoire ;
+- les tentatives sont consultables dans le panel admin (`/admin/connexions`,
+  permission `admin.audit.view`) et purgées à 30 jours par `maintenance.ts`.
+
+Ce second étage **ne règle pas le multi-instance** : deux processus
+continueraient de doubler les quotas dans leur fenêtre courante, et
+`globalThis.__mdtIo` casserait le temps réel de la même façon. Les deux pièges
+sont documentés dans `deploy/nginx.conf.example`, à l'endroit où l'on serait
+tenté d'ajouter un second `server` à l'`upstream`.
 
 ## Adresse du client derrière le proxy
 
@@ -151,9 +174,10 @@ le signal de repli.
 
 `src/lib/maintenance.ts`, déclenché par `server.ts` au démarrage puis toutes
 les six heures : suppression des sessions périmées, des images qu'aucune fiche
-ne référence plus, et bascule des mandats, BOLO et licences arrivés à
-échéance. Comme le temps réel, ce ménage n'existe pas sous `npm run dev:next`
-— l'application fonctionne, elle accumule.
+ne référence plus et des tentatives de connexion de plus de 30 jours, et
+bascule des mandats, BOLO et licences arrivés à échéance. Comme le temps réel,
+ce ménage n'existe pas sous `npm run dev:next` — l'application fonctionne, elle
+accumule.
 
 **Expiration : deux déclencheurs, une seule définition.**
 `expireStaleRecords(prisma)` vit dans `maintenance.ts` ; `src/lib/expiry.ts`

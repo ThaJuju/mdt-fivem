@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { clientIpKey } from "@/lib/client-ip";
+import { clientIp, clientIpKey } from "@/lib/client-ip";
+import { hydrateLoginCounters, recordLoginAttempt } from "@/lib/login-attempts";
 import { verifyPassword, verifyAgainstDecoy, createSession } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import {
@@ -75,6 +76,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   const { username, password } = parsed.data;
+  const ipValue = await clientIp();
   const ip = await clientIpKey();
   const account = username.toLowerCase();
   const counters = [
@@ -82,6 +84,12 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     [`login:ip:${ip}`, PER_IP],
     [`login:user:${account}`, PER_USERNAME],
   ] as const;
+
+  // Mémoire longue : au premier passage sur une clé que ce processus ne
+  // connaît pas — après un redémarrage, typiquement — les échecs encore
+  // comptables sont relus en base. Sans cela, redémarrer le serveur rendait
+  // ses cinq tentatives à qui venait de les épuiser.
+  await hydrateLoginCounters(counters, { identifier: account, ip: ipValue });
 
   // Refus *avant* toute requête et tout Argon2 : un hachage coûte
   // volontairement cher, le marteler serait à soi seul un déni de service.
@@ -104,11 +112,18 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 
   if (!user || !user.isActive || !passwordOk) {
     for (const [key, rule] of counters) consumeRateLimit(key, rule);
+    // Seules les tentatives réellement vérifiées sont enregistrées : celles
+    // que la limitation a refusées plus haut n'ont pas coûté d'Argon2 et les
+    // compter deux fois fausserait le réamorçage.
+    await recordLoginAttempt({ identifier: account, ip: ipValue, succeeded: false });
     await audit(user ? { id: user.id } : null, "auth.login_failed", { metadata: { username, ip } });
     return { error: "Identifiant ou mot de passe incorrect." };
   }
 
   for (const [key] of counters) resetRateLimit(key);
+  // Enregistré aussi : c'est ce succès qui, relu après un redémarrage, remet
+  // les compteurs à zéro comme `resetRateLimit()` vient de le faire ici.
+  await recordLoginAttempt({ identifier: account, ip: ipValue, succeeded: true });
 
   await createSession(user.id);
   await audit({ id: user.id }, "auth.login");

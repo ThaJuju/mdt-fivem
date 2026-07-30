@@ -73,6 +73,32 @@ model Session {
   @@index([userId])
 }
 
+/// Tentatives de connexion, succès comme échecs.
+///
+/// La limitation de débit reste en mémoire — c'est le bon choix pour un
+/// serveur unique, et elle absorbe les rafales sans toucher la base. Cette
+/// table est sa mémoire longue : elle permet de reconstituer les compteurs
+/// après un redémarrage (sans quoi un attaquant récupère ses cinq tentatives
+/// à chaque déploiement) et donne enfin à un administrateur un écran où voir
+/// les tentatives échouées sur un compte.
+///
+/// Purgée par `src/lib/maintenance.ts`.
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  /// Identifiant saisi, en minuscules. Conservé même quand aucun compte ne
+  /// correspond : c'est justement ce qui révèle un balayage.
+  identifier String
+  /// `null` quand l'adresse n'a pas pu être établie de façon fiable — voir
+  /// `clientIp()`. On ne stocke pas une valeur douteuse.
+  ip         String?
+  succeeded  Boolean
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, createdAt])
+  @@index([ip, createdAt])
+  @@index([createdAt])
+}
+
 enum DepartmentType {
   POLICE
   EMS

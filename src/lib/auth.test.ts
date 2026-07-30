@@ -35,6 +35,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     username: "agent",
     firstName: "Jean",
     lastName: "Dupont",
+    avatarUrl: null,
     isSuperAdmin: false,
     mustChangePassword: false,
     permissions: new Set<string>(),

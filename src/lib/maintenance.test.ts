@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { expireStaleRecords } from "./maintenance";
+import { expireStaleRecords, purgeOldLoginAttempts } from "./maintenance";
 
 type UpdateManyCall = { where: Record<string, unknown>; data: Record<string, unknown> };
 
@@ -76,5 +76,28 @@ describe("expireStaleRecords", () => {
   it("retourne le nombre total d'enregistrements basculés", async () => {
     const { prisma } = stubPrisma({ warrant: 2, bolo: 1, license: 4 });
     expect(await expireStaleRecords(prisma)).toBe(7);
+  });
+});
+
+describe("purgeOldLoginAttempts", () => {
+  it("garde trente jours de tentatives, bien au-delà de la fenêtre de limitation", async () => {
+    let where: { createdAt: { lt: Date } } | undefined;
+    const prisma = {
+      loginAttempt: {
+        deleteMany: vi.fn(async (args: { where: { createdAt: { lt: Date } } }) => {
+          where = args.where;
+          return { count: 3 };
+        }),
+      },
+    } as unknown as PrismaClient;
+
+    expect(await purgeOldLoginAttempts(prisma)).toBe(3);
+
+    const cutoff = where!.createdAt.lt.getTime();
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    // La table sert aussi d'historique consultable : purger à quinze minutes
+    // priverait l'administrateur de tout recul.
+    expect(Date.now() - cutoff).toBeGreaterThanOrEqual(thirtyDays - 5_000);
+    expect(Date.now() - cutoff).toBeLessThanOrEqual(thirtyDays + 5_000);
   });
 });

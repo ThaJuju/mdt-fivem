@@ -28,7 +28,23 @@ export type MaintenanceReport = {
   expiredSessions: number;
   orphanUploads: number;
   expiredDocuments: number;
+  oldLoginAttempts: number;
 };
+
+/**
+ * Rétention des tentatives de connexion : bien plus large que la fenêtre de
+ * quinze minutes de la limitation de débit, parce que la table sert aussi
+ * d'historique consultable. « 40 échecs sur ce compte la semaine dernière »
+ * a une valeur que quinze minutes n'ont pas.
+ */
+const LOGIN_ATTEMPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function purgeOldLoginAttempts(prisma: PrismaClient): Promise<number> {
+  const { count } = await prisma.loginAttempt.deleteMany({
+    where: { createdAt: { lt: new Date(Date.now() - LOGIN_ATTEMPT_RETENTION_MS) } },
+  });
+  return count;
+}
 
 /**
  * Bascule les mandats, BOLO et licences arrivés à échéance.
@@ -152,10 +168,11 @@ export async function purgeOrphanUploads(prisma: PrismaClient): Promise<number> 
 }
 
 export async function runMaintenance(prisma: PrismaClient): Promise<MaintenanceReport> {
-  const [expiredSessions, orphanUploads, expiredDocuments] = await Promise.all([
+  const [expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts] = await Promise.all([
     purgeExpiredSessions(prisma),
     purgeOrphanUploads(prisma),
     expireStaleRecords(prisma),
+    purgeOldLoginAttempts(prisma),
   ]);
-  return { expiredSessions, orphanUploads, expiredDocuments };
+  return { expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts };
 }
