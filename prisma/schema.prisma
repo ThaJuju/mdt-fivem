@@ -69,6 +69,7 @@ model Session {
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -196,6 +197,11 @@ model Citizen {
   isMedicalOnly Boolean @default(false)
   isDeceased  Boolean   @default(false)
   deceasedAt  DateTime?
+  /// Fiche retirée des listes et de la recherche, mais conservée : elle reste
+  /// atteignable depuis les rapports, charges et mandats qui la citent. C'est
+  /// la bonne primitive quand une fiche ne doit plus circuler sans pour
+  /// autant disparaître — une suppression casserait les dossiers.
+  archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -796,6 +802,7 @@ model Shift {
   department   Department @relation(fields: [departmentId], references: [id])
   startedAt    DateTime   @default(now())
   endedAt      DateTime?
+  autoClosed   Boolean    @default(false)
 
   @@index([userId])
   @@index([departmentId])

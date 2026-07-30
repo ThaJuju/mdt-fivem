@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/user-avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -57,6 +58,9 @@ export type RosterRow = {
   membershipId: string;
   userId: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
   departmentId: string;
   departmentShortName: string;
   gradeName: string;
@@ -65,6 +69,7 @@ export type RosterRow = {
   callsign: string | null;
   status: string;
   hiredAt: string;
+  lastShiftAt: string | null;
   disciplines: { id: string; type: string; reason: string; createdAt: string }[];
   certifications: { id: string; name: string; expiresAt: string | null }[];
 };
@@ -563,6 +568,7 @@ export function RosterSection({
                 <th className="p-2 font-medium">Grade</th>
                 <th className="p-2 font-medium">Matricule</th>
                 <th className="p-2 font-medium">Depuis</th>
+                <th className="p-2 font-medium">Dernière vacation</th>
                 <th className="p-2 font-medium">Statut</th>
                 <th className="w-28 p-2" />
               </tr>
@@ -571,18 +577,21 @@ export function RosterSection({
               {roster.map((row) => (
                 <tr key={row.membershipId} className="border-b border-border last:border-0">
                   <td className="p-2">
-                    <div className="flex flex-col">
-                      <span>{row.name}</span>
-                      {row.certifications.length > 0 ? (
-                        <span className="text-xs text-muted-foreground">
-                          {row.certifications.map((c) => c.name).join(", ")}
-                        </span>
-                      ) : null}
-                      {row.disciplines.length > 0 ? (
-                        <span className="text-xs text-muted-foreground">
-                          {row.disciplines.length} entrée{row.disciplines.length > 1 ? "s" : ""} au dossier
-                        </span>
-                      ) : null}
+                    <div className="flex items-center gap-2">
+                      <UserAvatar firstName={row.firstName} lastName={row.lastName} avatarUrl={row.avatarUrl} size="sm" />
+                      <div className="flex flex-col">
+                        <span>{row.name}</span>
+                        {row.certifications.length > 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            {row.certifications.map((c) => c.name).join(", ")}
+                          </span>
+                        ) : null}
+                        {row.disciplines.length > 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            {row.disciplines.length} entrée{row.disciplines.length > 1 ? "s" : ""} au dossier
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </td>
                   <td className="p-2 font-mono text-xs">{row.departmentShortName}</td>
@@ -593,6 +602,11 @@ export function RosterSection({
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">
                     {format(new Date(row.hiredAt), "dd/MM/yyyy", { locale: fr })}
+                  </td>
+                  <td className="p-2 text-xs text-muted-foreground">
+                    {row.lastShiftAt
+                      ? format(new Date(row.lastShiftAt), "dd/MM/yyyy HH:mm", { locale: fr })
+                      : "Jamais"}
                   </td>
                   <td className="p-2">
                     <Badge variant={row.status === "ACTIVE" ? "outline" : "secondary"}>

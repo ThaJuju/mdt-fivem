@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { expireStaleRecords } from "@/lib/expiry";
 import { parsePageParams, pageCount } from "@/lib/pagination";
 import { Badge } from "@/components/ui/badge";
+import { SearchBox } from "@/components/search-box";
 import { BoloFilters } from "./bolo-filters";
 import { BolosPagination } from "./bolos-pagination";
 import {
@@ -40,9 +41,22 @@ export default async function BolosPage({
   const params = await searchParams;
   const { page, pageSize, skip, take } = parsePageParams(params, 25);
   const scope = params.scope === "closed" ? "closed" : params.scope === "all" ? "all" : "active";
+  const q = typeof params.q === "string" ? params.q.trim() : "";
 
-  const where: Prisma.BoloWhereInput =
-    scope === "all" ? {} : scope === "closed" ? { isActive: false } : { isActive: true };
+  const where: Prisma.BoloWhereInput = {
+    ...(scope === "all" ? {} : scope === "closed" ? { isActive: false } : { isActive: true }),
+    ...(q
+      ? {
+          OR: [
+            { title: { contains: q, mode: "insensitive" as const } },
+            { plate: { contains: q, mode: "insensitive" as const } },
+            { citizen: { is: { firstName: { contains: q, mode: "insensitive" as const } } } },
+            { citizen: { is: { lastName: { contains: q, mode: "insensitive" as const } } } },
+            { vehicle: { is: { plate: { contains: q, mode: "insensitive" as const } } } },
+          ],
+        }
+      : {}),
+  };
 
   const [bolos, total] = await Promise.all([
     prisma.bolo.findMany({
@@ -69,7 +83,10 @@ export default async function BolosPage({
         {canManage ? <CreateBoloDialog /> : null}
       </div>
 
-      <BoloFilters />
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchBox placeholder="Titre, nom ou plaque…" />
+        <BoloFilters />
+      </div>
 
       {bolos.length === 0 ? (
         <p className="rounded-md border border-dashed border-border p-8 text-center text-muted-foreground">

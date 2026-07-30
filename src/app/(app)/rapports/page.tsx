@@ -96,7 +96,7 @@ export default async function RapportsPage({
       skip,
       take,
       include: {
-        author: { select: { firstName: true, lastName: true } },
+        author: { select: { firstName: true, lastName: true, avatarUrl: true } },
         department: { select: { shortName: true, color: true } },
       },
     }),
@@ -111,6 +111,9 @@ export default async function RapportsPage({
     status: report.status,
     occurredAt: report.occurredAt,
     authorName: `${report.author.lastName} ${report.author.firstName}`,
+    authorFirstName: report.author.firstName,
+    authorLastName: report.author.lastName,
+    authorAvatarUrl: report.author.avatarUrl,
     departmentShortName: report.department.shortName,
     departmentColor: report.department.color,
   }));

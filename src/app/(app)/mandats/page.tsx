@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { expireStaleRecords } from "@/lib/expiry";
 import { parsePageParams, pageCount } from "@/lib/pagination";
 import { Badge } from "@/components/ui/badge";
+import { SearchBox } from "@/components/search-box";
 import { WarrantFilters } from "./warrant-filters";
 import {
   RequestWarrantDialog,
@@ -46,10 +47,23 @@ export default async function MandatsPage({
   const { page, pageSize, skip, take } = parsePageParams(params, 25);
   const statusFilter =
     typeof params.status === "string" && STATUSES.has(params.status) ? params.status : undefined;
+  const q = typeof params.q === "string" ? params.q.trim() : "";
 
-  const where: Prisma.WarrantWhereInput = statusFilter
-    ? { status: statusFilter as Prisma.EnumWarrantStatusFilter["equals"] }
-    : {};
+  const where: Prisma.WarrantWhereInput = {
+    ...(statusFilter ? { status: statusFilter as Prisma.EnumWarrantStatusFilter["equals"] } : {}),
+    ...(q
+      ? {
+          citizen: {
+            is: {
+              OR: [
+                { firstName: { contains: q, mode: "insensitive" as const } },
+                { lastName: { contains: q, mode: "insensitive" as const } },
+              ],
+            },
+          },
+        }
+      : {}),
+  };
 
   const [warrants, total] = await Promise.all([
     prisma.warrant.findMany({
@@ -78,7 +92,10 @@ export default async function MandatsPage({
         {can(actor, "warrants.request") ? <RequestWarrantDialog /> : null}
       </div>
 
-      <WarrantFilters />
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchBox placeholder="Nom de la personne recherchée…" />
+        <WarrantFilters />
+      </div>
 
       {warrants.length === 0 ? (
         <p className="rounded-md border border-dashed border-border p-8 text-center text-muted-foreground">

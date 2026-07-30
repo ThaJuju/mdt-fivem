@@ -23,6 +23,7 @@ export type ClientActor = {
   username: string;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
   isSuperAdmin: boolean;
   permissions: string[];
   memberships: ClientActorMembership[];

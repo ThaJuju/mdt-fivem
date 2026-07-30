@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { expireStaleRecords, purgeOldLoginAttempts } from "./maintenance";
+import { closeStaleShifts, expireStaleRecords, purgeOldLoginAttempts } from "./maintenance";
 
 type UpdateManyCall = { where: Record<string, unknown>; data: Record<string, unknown> };
 
@@ -99,5 +99,40 @@ describe("purgeOldLoginAttempts", () => {
     // priverait l'administrateur de tout recul.
     expect(Date.now() - cutoff).toBeGreaterThanOrEqual(thirtyDays - 5_000);
     expect(Date.now() - cutoff).toBeLessThanOrEqual(thirtyDays + 5_000);
+  });
+});
+
+describe("closeStaleShifts", () => {
+  it("ferme à exactement seize heures et marque les vacations oubliées", async () => {
+    const startedAt = new Date("2026-07-01T08:00:00.000Z");
+    const update = vi.fn(async () => ({}));
+    const transaction = vi.fn(async (operations: Promise<unknown>[]) => Promise.all(operations));
+    const prisma = {
+      shift: {
+        findMany: vi.fn(async () => [{ id: "shift-1", startedAt }]),
+        update,
+      },
+      $transaction: transaction,
+    } as unknown as PrismaClient;
+
+    expect(await closeStaleShifts(prisma)).toBe(1);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "shift-1" },
+      data: {
+        endedAt: new Date("2026-07-02T00:00:00.000Z"),
+        autoClosed: true,
+      },
+    });
+  });
+
+  it("ne lance aucune transaction sans vacation aberrante", async () => {
+    const transaction = vi.fn();
+    const prisma = {
+      shift: { findMany: vi.fn(async () => []) },
+      $transaction: transaction,
+    } as unknown as PrismaClient;
+
+    expect(await closeStaleShifts(prisma)).toBe(0);
+    expect(transaction).not.toHaveBeenCalled();
   });
 });

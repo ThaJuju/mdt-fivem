@@ -28,6 +28,7 @@ export default async function VehiculesPage({
   const where: Prisma.VehicleWhereInput = q
     ? {
         OR: [
+          { vin: { equals: q, mode: "insensitive" } },
           { plate: { contains: q, mode: "insensitive" } },
           { make: { contains: q, mode: "insensitive" } },
           { model: { contains: q, mode: "insensitive" } },

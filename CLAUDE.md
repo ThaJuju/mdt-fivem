@@ -243,6 +243,26 @@ Il n'y a pas encore de tests d'intégration sur base jetable (barème figé,
 workflow de rapport, autorisation par server action) ni de fumée HTTP : c'est
 la suite prévue par l'issue #27.
 
+## Supprimer ou archiver une fiche citoyen
+
+Deux primitives distinctes, et l'ordre compte :
+
+- **`citizens.delete`** ne réussit que sur une fiche que *rien* ne cite —
+  aucun rapport, charge, mandat, BOLO, véhicule, arme ni propriété. En
+  pratique : un doublon ou une faute de frappe. `deleteCitizen` compte les
+  références avant d'essayer, pour pouvoir dire lesquelles bloquent ; sans ce
+  décompte PostgreSQL lèverait un P2003 illisible.
+- **`citizens.archive`** est la sortie normale pour tout le reste. Une fiche
+  archivée (`Citizen.archivedAt`) disparaît des listes, de la recherche
+  globale et des sélecteurs, mais reste consultable depuis les dossiers qui la
+  citent — un rapport ne doit jamais perdre son suspect. Réversible.
+
+Notes, licences et dossier médical portent `onDelete: Cascade` : ils
+appartiennent à la fiche. Rien d'autre n'en dépend au point de partir avec
+elle. Toute nouvelle requête listant des citoyens doit filtrer
+`archivedAt: null` — l'oublier fait revenir les fiches retirées par la petite
+porte.
+
 ## Charges : barème figé
 
 Quand une infraction est ajoutée à un rapport, `fine`, `jailMinutes` et

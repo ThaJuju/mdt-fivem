@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRound, LogOut, Radio } from "lucide-react";
+import { LogOut, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { clearAllDrafts } from "@/lib/draft-storage";
 import { useActor } from "./actor-provider";
 import { GlobalSearch } from "./global-search";
 import { PanicButton } from "./panic-button";
+import { UserAvatar } from "./user-avatar";
 
 export type UnitStatusInfo = {
   id: string;
@@ -119,12 +120,17 @@ export function AppNav({ unit }: { unit: UnitStatusInfo | null }) {
         <span className="hidden font-mono text-xs tracking-[0.08em] text-muted-foreground tabular-nums 2xl:inline">
           {timeLabel}
         </span>
-        <span className="hidden max-w-32 truncate text-xs font-medium text-foreground 2xl:inline">
-          {actor.firstName} {actor.lastName}
-        </span>
-        <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" title="Changer le mot de passe">
-          <Link href="/changer-mot-de-passe">
-            <KeyRound className="size-4" />
+        <Button asChild variant="ghost" className="h-10 gap-2 px-2" title="Mon compte">
+          <Link href="/mon-compte">
+            <UserAvatar
+              firstName={actor.firstName}
+              lastName={actor.lastName}
+              avatarUrl={actor.avatarUrl}
+              size="sm"
+            />
+            <span className="hidden max-w-32 truncate text-xs font-medium text-foreground 2xl:inline">
+              {actor.firstName} {actor.lastName}
+            </span>
           </Link>
         </Button>
         <form action={logout} onSubmit={() => clearAllDrafts()}>

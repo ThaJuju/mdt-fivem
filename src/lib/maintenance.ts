@@ -29,6 +29,7 @@ export type MaintenanceReport = {
   orphanUploads: number;
   expiredDocuments: number;
   oldLoginAttempts: number;
+  autoClosedShifts: number;
 };
 
 /**
@@ -91,6 +92,35 @@ export async function purgeExpiredSessions(prisma: PrismaClient): Promise<number
     where: { expiresAt: { lt: new Date() } },
   });
   return count;
+}
+
+const MAX_SHIFT_DURATION_MS = 16 * 60 * 60 * 1000;
+
+/**
+ * Ferme à exactement seize heures les vacations oubliées. L'heure limite,
+ * plutôt que l'heure du balayage, évite de créditer jusqu'à six heures
+ * supplémentaires selon le moment où tourne la maintenance.
+ */
+export async function closeStaleShifts(prisma: PrismaClient): Promise<number> {
+  const cutoff = new Date(Date.now() - MAX_SHIFT_DURATION_MS);
+  const stale = await prisma.shift.findMany({
+    where: { endedAt: null, startedAt: { lt: cutoff } },
+    select: { id: true, startedAt: true },
+  });
+  if (stale.length === 0) return 0;
+
+  await prisma.$transaction(
+    stale.map((shift) =>
+      prisma.shift.update({
+        where: { id: shift.id },
+        data: {
+          endedAt: new Date(shift.startedAt.getTime() + MAX_SHIFT_DURATION_MS),
+          autoClosed: true,
+        },
+      }),
+    ),
+  );
+  return stale.length;
 }
 
 /** Toutes les colonnes qui peuvent référencer un fichier envoyé. */
@@ -168,11 +198,12 @@ export async function purgeOrphanUploads(prisma: PrismaClient): Promise<number> 
 }
 
 export async function runMaintenance(prisma: PrismaClient): Promise<MaintenanceReport> {
-  const [expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts] = await Promise.all([
+  const [expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts, autoClosedShifts] = await Promise.all([
     purgeExpiredSessions(prisma),
     purgeOrphanUploads(prisma),
     expireStaleRecords(prisma),
     purgeOldLoginAttempts(prisma),
+    closeStaleShifts(prisma),
   ]);
-  return { expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts };
+  return { expiredSessions, orphanUploads, expiredDocuments, oldLoginAttempts, autoClosedShifts };
 }

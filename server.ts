@@ -35,13 +35,18 @@ async function maintenanceTick() {
   try {
     const report = await runMaintenance(prisma);
     const total =
-      report.expiredSessions + report.orphanUploads + report.expiredDocuments + report.oldLoginAttempts;
+      report.expiredSessions +
+      report.orphanUploads +
+      report.expiredDocuments +
+      report.oldLoginAttempts +
+      report.autoClosedShifts;
     if (total > 0) {
       console.log(
         `> ménage : ${report.expiredSessions} session(s) périmée(s), ` +
           `${report.orphanUploads} image(s) orpheline(s) supprimée(s), ` +
           `${report.expiredDocuments} document(s) expiré(s), ` +
-          `${report.oldLoginAttempts} tentative(s) de connexion oubliée(s)`,
+          `${report.oldLoginAttempts} tentative(s) de connexion oubliée(s), ` +
+          `${report.autoClosedShifts} vacation(s) fermée(s) automatiquement`,
       );
     }
   } catch (error) {

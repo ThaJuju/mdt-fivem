@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Archive } from "lucide-react";
 import { differenceInYears, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { requireActor, requirePagePermission, can } from "@/lib/auth";
@@ -15,6 +15,8 @@ import { CitizenForm } from "../citizen-form";
 import { NotesSection } from "./notes-section";
 import { LicensesSection } from "./licenses-section";
 import { DeceasedToggle } from "./deceased-toggle";
+import { ArchiveToggle } from "./archive-toggle";
+import { DeleteCitizenButton } from "./delete-citizen-button";
 import { CriminalRecordSection, InvolvementHistorySection } from "./criminal-record-section";
 
 export const metadata: Metadata = { title: "Fiche citoyen — MDT" };
@@ -110,6 +112,17 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-6">
+      {citizen.archivedAt ? (
+        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-4 text-muted-foreground">
+          <Archive className="size-4 shrink-0" />
+          <span className="text-sm">
+            Fiche archivée le {format(citizen.archivedAt, "dd/MM/yyyy", { locale: fr })} : elle
+            n&apos;apparaît plus dans les listes ni dans la recherche, et ne peut plus être rattachée à
+            un nouveau dossier. Les dossiers existants la citent toujours.
+          </span>
+        </div>
+      ) : null}
+
       {activeWarrants.length > 0 ? (
         <div className="flex flex-col gap-2 rounded-md border border-alert bg-alert/10 p-4">
           <div className="flex items-center gap-2 text-alert">
@@ -168,9 +181,15 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
             <Badge variant="outline">Apte au port d&apos;arme</Badge>
           ) : null}
         </div>
-        {can(actor, "citizens.edit") ? (
-          <DeceasedToggle citizenId={citizen.id} isDeceased={citizen.isDeceased} />
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {can(actor, "citizens.edit") ? (
+            <DeceasedToggle citizenId={citizen.id} isDeceased={citizen.isDeceased} />
+          ) : null}
+          {can(actor, "citizens.archive") ? (
+            <ArchiveToggle citizenId={citizen.id} isArchived={citizen.archivedAt !== null} />
+          ) : null}
+          {can(actor, "citizens.delete") ? <DeleteCitizenButton citizenId={citizen.id} /> : null}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -324,6 +343,9 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
           isFlagged: note.isFlagged,
           createdAt: note.createdAt,
           authorName: `${note.author.firstName} ${note.author.lastName}`,
+          authorFirstName: note.author.firstName,
+          authorLastName: note.author.lastName,
+          authorAvatarUrl: note.author.avatarUrl,
         }))}
         canCreate={can(actor, "citizens.notes.create")}
         canDelete={can(actor, "citizens.notes.delete")}

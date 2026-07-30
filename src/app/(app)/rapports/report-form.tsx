@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,10 +44,14 @@ export function ReportForm({
   report,
   readOnly = false,
   allowPhotos = false,
+  onSaved,
+  onCancel,
 }: {
   departments: { id: string; shortName: string; name: string }[];
   report?: ExistingReport;
   readOnly?: boolean;
+  onSaved?: () => void;
+  onCancel?: () => void;
   /**
    * Uniquement à la rédaction : une fois le rapport créé, les photos passent
    * par la section « Pièces jointes », qui permet de les nommer et décrire.
@@ -55,6 +61,8 @@ export function ReportForm({
   const action = report ? updateReport : createReport;
   const [state, formAction, isPending] = useActionState(action, initialState);
   const actor = useActor();
+  const router = useRouter();
+  const submitted = useRef(false);
 
   // Le brouillon ne concerne que la rédaction : modifier un rapport existant
   // travaille déjà sur des données enregistrées.
@@ -93,6 +101,20 @@ export function ReportForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  useEffect(() => {
+    if (!report || !submitted.current) return;
+    if (state.error || state.fieldErrors) {
+      submitted.current = false;
+      if (state.error) toast.error(state.error);
+      return;
+    }
+
+    submitted.current = false;
+    toast.success("Rapport mis à jour.");
+    onSaved?.();
+    router.refresh();
+  }, [onSaved, report, router, state]);
+
   // On montre l'affectation correspondant au service choisi : un agent qui
   // appartient à deux services n'a pas le même matricule dans chacun.
   const activePostings = actor.memberships.filter((m) => m.status === "ACTIVE");
@@ -110,6 +132,7 @@ export function ReportForm({
       action={formAction}
       onSubmit={() => {
         if (isDrafting) clearDraft(DRAFT_KEY);
+        else submitted.current = true;
       }}
       className="flex flex-col gap-4"
     >
@@ -251,10 +274,17 @@ export function ReportForm({
       ) : null}
 
       {!readOnly ? (
-        <Button type="submit" disabled={isPending} className="w-fit">
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          {report ? "Enregistrer le rapport" : "Créer le rapport"}
-        </Button>
+        <div className="flex items-center justify-end gap-2 border-t border-border/70 pt-4">
+          {report && onCancel ? (
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              Annuler
+            </Button>
+          ) : null}
+          <Button type="submit" disabled={isPending}>
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            {report ? "Enregistrer le rapport" : "Créer le rapport"}
+          </Button>
+        </div>
       ) : null}
     </form>
   );

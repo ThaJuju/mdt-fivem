@@ -100,6 +100,128 @@ export async function setCitizenDeceased(_prevState: FormState, formData: FormDa
   return {};
 }
 
+/**
+ * Ce qui rattache une fiche au reste du MDT et interdit de la supprimer.
+ *
+ * Les notes, licences et le dossier médical portent `onDelete: Cascade` : ils
+ * appartiennent à la fiche et partent avec elle. Tout ce qui suit, non — un
+ * rapport, une charge ou un mandat sont des dossiers autonomes, et effacer le
+ * citoyen qu'ils citent les laisserait sans sujet. PostgreSQL refuserait de
+ * toute façon (P2003) ; on compte d'abord pour pouvoir dire *pourquoi*.
+ */
+const CITIZEN_REFERENCES = [
+  { label: "rapport", plural: "rapports", model: "reportInvolvement" },
+  { label: "charge retenue", plural: "charges retenues", model: "charge" },
+  { label: "mandat", plural: "mandats", model: "warrant" },
+  { label: "BOLO", plural: "BOLO", model: "bolo" },
+  { label: "véhicule", plural: "véhicules", model: "vehicle" },
+  { label: "arme", plural: "armes", model: "weapon" },
+  { label: "propriété", plural: "propriétés", model: "property" },
+] as const;
+
+async function citizenReferences(citizenId: string): Promise<string[]> {
+  const [involvements, charges, warrants, bolos, vehicles, weapons, properties] = await Promise.all([
+    prisma.reportInvolvement.count({ where: { citizenId } }),
+    prisma.charge.count({ where: { citizenId } }),
+    prisma.warrant.count({ where: { citizenId } }),
+    prisma.bolo.count({ where: { citizenId } }),
+    prisma.vehicle.count({ where: { ownerId: citizenId } }),
+    prisma.weapon.count({ where: { ownerId: citizenId } }),
+    prisma.property.count({ where: { citizenId } }),
+  ]);
+
+  const counts = [involvements, charges, warrants, bolos, vehicles, weapons, properties];
+  return CITIZEN_REFERENCES.flatMap((reference, index) => {
+    const count = counts[index];
+    if (count === 0) return [];
+    return [`${count} ${count > 1 ? reference.plural : reference.label}`];
+  });
+}
+
+/**
+ * Suppression définitive d'une fiche citoyen.
+ *
+ * Volontairement étroite : elle n'aboutit que sur une fiche que rien ne cite,
+ * c'est-à-dire, en pratique, une fiche créée par erreur — doublon, faute de
+ * frappe sur un nom. Dès qu'un dossier s'y rattache, le refus renvoie vers
+ * l'archivage plutôt que de laisser l'agent devant un échec sec.
+ */
+export async function deleteCitizen(_prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const actor = await requireActor();
+    assertCan(actor, "citizens.delete");
+
+    const citizenId = String(formData.get("citizenId"));
+    const citizen = await prisma.citizen.findUnique({
+      where: { id: citizenId, isMedicalOnly: false },
+      select: { firstName: true, lastName: true },
+    });
+    if (!citizen) return { error: "Cette fiche n'existe plus." };
+
+    const references = await citizenReferences(citizenId);
+    if (references.length > 0) {
+      return {
+        error:
+          `Cette fiche est citée par ${references.join(", ")} : la supprimer laisserait ces dossiers ` +
+          "sans sujet. Archivez-la plutôt — elle sortira des listes et de la recherche tout en restant " +
+          "consultable depuis les dossiers qui la citent.",
+      };
+    }
+
+    await prisma.citizen.delete({ where: { id: citizenId } });
+    await audit(actor, "citizen.delete", {
+      entity: "Citizen",
+      entityId: citizenId,
+      // La fiche n'existe plus : sans son nom dans la trace, l'entrée d'audit
+      // ne dit rien de ce qui a disparu.
+      metadata: { name: `${citizen.firstName} ${citizen.lastName}` },
+    });
+    revalidatePath("/citoyens");
+  } catch (err) {
+    if (err instanceof ActionError) return { error: err.message };
+    throw err;
+  }
+  redirect("/citoyens");
+}
+
+/**
+ * Archivage : la fiche sort des listes et de la recherche, mais reste
+ * atteignable depuis les rapports, charges et mandats qui la citent. C'est la
+ * primitive qui manquait — une fiche référencée ne doit jamais disparaître,
+ * et un catalogue qui ne propose que « supprimer » ment sur ce qu'on peut
+ * réellement faire.
+ */
+export async function setCitizenArchived(_prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    const actor = await requireActor();
+    assertCan(actor, "citizens.archive");
+
+    const citizenId = String(formData.get("citizenId"));
+    const archived = formData.get("archived") === "true";
+
+    const citizen = await prisma.citizen.findUnique({
+      where: { id: citizenId, isMedicalOnly: false },
+      select: { id: true },
+    });
+    if (!citizen) return { error: "Cette fiche n'existe plus." };
+
+    await prisma.citizen.update({
+      where: { id: citizenId },
+      data: { archivedAt: archived ? new Date() : null },
+    });
+    await audit(actor, archived ? "citizen.archive" : "citizen.unarchive", {
+      entity: "Citizen",
+      entityId: citizenId,
+    });
+    revalidatePath("/citoyens");
+    revalidatePath(`/citoyens/${citizenId}`);
+    return {};
+  } catch (err) {
+    if (err instanceof ActionError) return { error: err.message };
+    throw err;
+  }
+}
+
 export async function addCitizenNote(_prevState: FormState, formData: FormData): Promise<FormState> {
   try {
     const actor = await requireActor();

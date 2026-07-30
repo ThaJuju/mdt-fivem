@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/** Extrait la première image d'une liste de fichiers. */
+function firstImage(items: FileList | null | undefined): File | null {
+  if (!items) return null;
+  for (const file of Array.from(items)) {
+    if (file.type.startsWith("image/")) return file;
+  }
+  return null;
+}
 
 /**
  * Champ image : coller (Ctrl+V), déposer ou choisir un fichier.
@@ -22,10 +31,14 @@ export function ImageField({
   name,
   defaultValue,
   label = "Image",
+  purpose,
+  maxBytes,
 }: {
   name: string;
   defaultValue?: string | null;
   label?: string;
+  purpose?: "avatar";
+  maxBytes?: number;
 }) {
   const [url, setUrl] = useState<string>(defaultValue ?? "");
   const [isUploading, setIsUploading] = useState(false);
@@ -34,12 +47,13 @@ export function ImageField({
   const zoneRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function upload(file: File) {
+  const upload = useCallback(async (file: File) => {
     setError(null);
     setIsUploading(true);
     try {
       const body = new FormData();
       body.append("file", file);
+      if (purpose) body.append("purpose", purpose);
       const response = await fetch("/api/upload", { method: "POST", body });
       const payload: unknown = await response.json().catch(() => null);
 
@@ -59,16 +73,7 @@ export function ImageField({
     } finally {
       setIsUploading(false);
     }
-  }
-
-  /** Extrait la première image d'un presse-papiers ou d'un glisser-déposer. */
-  function firstImage(items: FileList | null | undefined): File | null {
-    if (!items) return null;
-    for (const file of Array.from(items)) {
-      if (file.type.startsWith("image/")) return file;
-    }
-    return null;
-  }
+  }, [purpose]);
 
   function handlePaste(event: ClipboardEvent) {
     const file = firstImage(event.clipboardData?.files);
@@ -101,7 +106,7 @@ export function ImageField({
 
     document.addEventListener("paste", onDocumentPaste);
     return () => document.removeEventListener("paste", onDocumentPaste);
-  }, []);
+  }, [upload]);
 
   function handleDrop(event: DragEvent) {
     event.preventDefault();
@@ -169,7 +174,9 @@ export function ImageField({
             <span className="text-sm text-muted-foreground">
               Collez une image (Ctrl+V), déposez-la ici, ou cliquez pour la choisir
             </span>
-            <span className="text-xs text-muted-foreground">PNG, JPEG, GIF ou WebP — 5 Mo maximum</span>
+            <span className="text-xs text-muted-foreground">
+              PNG, JPEG, GIF ou WebP — {maxBytes ? `${Math.floor(maxBytes / (1024 * 1024))} Mo` : "5 Mo"} maximum
+            </span>
           </>
         )}
 
