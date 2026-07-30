@@ -261,6 +261,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           offenseName: charge.offense.name,
           count: charge.count,
           fine: charge.fine,
+          bail: charge.bail,
           jailMinutes: charge.jailMinutes,
           points: charge.points,
           isGuilty: charge.isGuilty,
@@ -273,6 +274,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           name: offense.name,
           categoryName: offense.category.name,
           fine: offense.fine,
+          bail: offense.bail,
           jailMinutes: offense.jailMinutes,
           points: offense.points,
         }))}

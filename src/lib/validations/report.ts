@@ -60,7 +60,6 @@ export const chargeSchema = z.object({
   offenseId: z.string().min(1, "Infraction requise."),
   count: z.coerce.number().int().min(1, "Au moins une occurrence."),
   isGuilty: z.boolean().default(true),
-  isPaid: z.boolean().default(false),
   notes: optionalText,
 });
 export type ChargeInput = z.infer<typeof chargeSchema>;
@@ -73,7 +72,6 @@ export const chargeAmountsSchema = z.object({
   points: z.coerce.number().int().nonnegative(),
   count: z.coerce.number().int().min(1),
   isGuilty: z.boolean().default(true),
-  isPaid: z.boolean().default(false),
 });
 
 export const rejectReportSchema = z.object({

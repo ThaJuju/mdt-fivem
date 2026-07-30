@@ -18,9 +18,12 @@ export type RecordCharge = {
   offenseType: string;
   count: number;
   fine: number;
+  bail: number | null;
   jailMinutes: number;
   points: number;
   isPaid: boolean;
+  paidAt: string | null;
+  paidByName: string | null;
   reportId: string;
   reportNumber: number;
   occurredAt: string;
@@ -75,8 +78,10 @@ export function CriminalRecordSection({
       jailMinutes: acc.jailMinutes + charge.jailMinutes * charge.count,
       points: acc.points + charge.points * charge.count,
       unpaid: acc.unpaid + (charge.isPaid ? 0 : charge.fine * charge.count),
+      paid: acc.paid + (charge.isPaid ? charge.fine * charge.count : 0),
+      bail: acc.bail + (charge.bail ?? 0) * charge.count,
     }),
-    { fine: 0, jailMinutes: 0, points: 0, unpaid: 0 },
+    { fine: 0, jailMinutes: 0, points: 0, unpaid: 0, paid: 0, bail: 0 },
   );
 
   // Les charges arrivent triées par date décroissante : on les regroupe par
@@ -110,9 +115,11 @@ export function CriminalRecordSection({
           </p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <Total label="Amendes" value={formatMoney(totals.fine)} />
               <Total label="Reste dû" value={formatMoney(totals.unpaid)} />
+              <Total label="Total réglé" value={formatMoney(totals.paid)} />
+              <Total label="Cautions" value={formatMoney(totals.bail)} />
               <Total label="Peine cumulée" value={formatJailTime(totals.jailMinutes)} />
               <Total label="Points" value={String(totals.points)} />
             </div>
@@ -144,6 +151,15 @@ export function CriminalRecordSection({
                           <Badge variant="secondary" className="text-xs">
                             Impayée
                           </Badge>
+                        ) : null}
+                        {charge.isPaid ? (
+                          <span className="text-xs text-muted-foreground">
+                            Réglée
+                            {charge.paidAt
+                              ? ` le ${format(new Date(charge.paidAt), "dd/MM/yyyy", { locale: fr })}`
+                              : ""}
+                            {charge.paidByName ? ` par ${charge.paidByName}` : ""}
+                          </span>
                         ) : null}
                       </li>
                     ))}

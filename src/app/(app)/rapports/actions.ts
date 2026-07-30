@@ -442,7 +442,6 @@ export async function addCharge(_prevState: FormState, formData: FormData): Prom
       offenseId: formData.get("offenseId"),
       count: formData.get("count") || "1",
       isGuilty: formData.get("isGuilty") !== "off",
-      isPaid: false,
       notes: formData.get("notes") ?? "",
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
@@ -458,6 +457,7 @@ export async function addCharge(_prevState: FormState, formData: FormData): Prom
         offenseId: offense.id,
         count: parsed.data.count,
         fine: offense.fine,
+        bail: offense.bail,
         jailMinutes: offense.jailMinutes,
         points: offense.points,
         isGuilty: parsed.data.isGuilty,
@@ -494,9 +494,17 @@ export async function updateCharge(_prevState: FormState, formData: FormData): P
       points: formData.get("points") || "0",
       count: formData.get("count") || "1",
       isGuilty: formData.get("isGuilty") === "on",
-      isPaid: formData.get("isPaid") === "on",
     });
     if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors };
+
+    const existingCharge = await prisma.charge.findUnique({
+      where: { id: parsed.data.id },
+      select: { isPaid: true },
+    });
+    if (!existingCharge) return { error: "Cette charge n'existe plus." };
+    if (existingCharge.isPaid) {
+      return { error: "Une amende encaissée ne peut plus être modifiée." };
+    }
 
     const data: Prisma.ChargeUpdateInput = {
       fine: parsed.data.fine,
@@ -504,7 +512,6 @@ export async function updateCharge(_prevState: FormState, formData: FormData): P
       points: parsed.data.points,
       count: parsed.data.count,
       isGuilty: parsed.data.isGuilty,
-      isPaid: parsed.data.isPaid,
     };
     await prisma.charge.update({ where: { id: parsed.data.id }, data });
     await audit(actor, "charge.update", { entity: "Charge", entityId: parsed.data.id });
@@ -523,7 +530,11 @@ export async function removeCharge(_prevState: FormState, formData: FormData): P
     const reportId = String(formData.get("reportId"));
     await assertCanEditReport(actor, reportId);
 
-    await prisma.charge.delete({ where: { id: String(formData.get("chargeId")) } });
+    const chargeId = String(formData.get("chargeId"));
+    const charge = await prisma.charge.findUnique({ where: { id: chargeId }, select: { isPaid: true } });
+    if (!charge) return { error: "Cette charge n'existe plus." };
+    if (charge.isPaid) return { error: "Une amende encaissée ne peut plus être supprimée." };
+    await prisma.charge.delete({ where: { id: chargeId } });
     await audit(actor, "charge.remove", { entity: "Report", entityId: reportId });
     revalidatePath(`/rapports/${reportId}`);
     return {};

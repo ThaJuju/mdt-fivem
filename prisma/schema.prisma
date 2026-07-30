@@ -37,6 +37,7 @@ model User {
   reportAssignments ReportOfficer[]
 
   authoredNotes CitizenNote[]
+  collectedCharges Charge[] @relation("ChargePaidBy")
 
   requestedWarrants Warrant[] @relation("WarrantRequestedBy")
   approvedWarrants  Warrant[] @relation("WarrantApprovedBy")
@@ -474,15 +475,22 @@ model Charge {
   offense     Offense @relation(fields: [offenseId], references: [id])
   count       Int     @default(1)
   fine        Int
+  bail        Int?
   jailMinutes Int
   points      Int
   isGuilty    Boolean @default(true)
   isPaid      Boolean @default(false)
+  paidAt      DateTime?
+  paidById    String?
+  paidBy      User?   @relation("ChargePaidBy", fields: [paidById], references: [id])
   notes       String?
+  createdAt   DateTime @default(now())
 
   @@index([reportId])
   @@index([citizenId])
   @@index([offenseId])
+  @@index([isPaid, createdAt])
+  @@index([paidById])
 }
 
 // ─────────────────────────────────────────────────────────────────────────

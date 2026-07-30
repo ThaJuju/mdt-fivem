@@ -82,8 +82,9 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
       include: {
         offense: { select: { code: true, name: true, type: true } },
         report: { select: { id: true, number: true, occurredAt: true } },
+        paidBy: { select: { firstName: true, lastName: true } },
       },
-      orderBy: { report: { occurredAt: "desc" } },
+      orderBy: [{ isPaid: "asc" }, { report: { occurredAt: "desc" } }],
       take: 100,
     }),
     prisma.reportInvolvement.findMany({
@@ -313,9 +314,14 @@ export default async function CitizenDetailPage({ params }: { params: Promise<{ 
           offenseType: charge.offense.type,
           count: charge.count,
           fine: charge.fine,
+          bail: charge.bail,
           jailMinutes: charge.jailMinutes,
           points: charge.points,
           isPaid: charge.isPaid,
+          paidAt: charge.paidAt?.toISOString() ?? null,
+          paidByName: charge.paidBy
+            ? `${charge.paidBy.firstName} ${charge.paidBy.lastName}`
+            : null,
           reportId: charge.report.id,
           reportNumber: charge.report.number,
           occurredAt: charge.report.occurredAt.toISOString(),

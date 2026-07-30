@@ -16,6 +16,7 @@ export type OffenseOption = {
   name: string;
   categoryName: string;
   fine: number;
+  bail: number | null;
   jailMinutes: number;
   points: number;
 };
@@ -116,8 +117,9 @@ export function ChargeForm({
             Barème repris du code pénal et figé sur ce rapport. Il restera modifiable ici sans affecter le
             code pénal.
           </p>
-          <div className="grid grid-cols-3 gap-2 font-mono">
+          <div className="grid grid-cols-4 gap-2 font-mono">
             <span>{formatMoney(selected.fine * count)}</span>
+            <span>{selected.bail == null ? "Sans caution" : `Caution ${formatMoney(selected.bail * count)}`}</span>
             <span>{formatJailTime(selected.jailMinutes * count)}</span>
             <span>{selected.points * count} pts</span>
           </div>

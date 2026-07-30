@@ -92,7 +92,10 @@ export const PERMISSIONS_CATALOG: PermissionDomain[] = [
     key: "charges",
     label: "Charges",
     restrictedTo: ["POLICE"],
-    permissions: [{ key: "manage", label: "Gérer les charges" }],
+    permissions: [
+      { key: "manage", label: "Gérer les charges" },
+      { key: "collect", label: "Encaisser les amendes" },
+    ],
   },
   {
     key: "penalcode",

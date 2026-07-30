@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { formatJailTime, formatMoney } from "@/lib/labels";
 import { ChargeForm, type OffenseOption, type InvolvedCitizen } from "./charge-form";
 import { updateCharge, removeCharge, type FormState } from "../actions";
+import { fineAmount } from "@/lib/fines";
 
 export type ChargeRow = {
   id: string;
@@ -20,6 +21,7 @@ export type ChargeRow = {
   offenseName: string;
   count: number;
   fine: number;
+  bail: number | null;
   jailMinutes: number;
   points: number;
   isGuilty: boolean;
@@ -83,12 +85,6 @@ function EditChargeDialog({ reportId, charge }: { reportId: string; charge: Char
             <Checkbox id={`guilty-${charge.id}`} name="isGuilty" defaultChecked={charge.isGuilty} />
             <Label htmlFor={`guilty-${charge.id}`} className="font-normal">
               Retenue contre la personne
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox id={`paid-${charge.id}`} name="isPaid" defaultChecked={charge.isPaid} />
-            <Label htmlFor={`paid-${charge.id}`} className="font-normal">
-              Amende réglée
             </Label>
           </div>
           <Button type="submit" disabled={isPending} className="w-fit">
@@ -168,11 +164,12 @@ export function ChargesSection({
   const retained = charges.filter((charge) => charge.isGuilty);
   const totals = retained.reduce(
     (acc, charge) => ({
-      fine: acc.fine + charge.fine * charge.count,
+      fine: acc.fine + fineAmount(charge),
+      bail: acc.bail + (charge.bail ?? 0) * charge.count,
       jailMinutes: acc.jailMinutes + charge.jailMinutes * charge.count,
       points: acc.points + charge.points * charge.count,
     }),
-    { fine: 0, jailMinutes: 0, points: 0 },
+    { fine: 0, bail: 0, jailMinutes: 0, points: 0 },
   );
 
   return (
@@ -196,6 +193,7 @@ export function ChargesSection({
                   <th className="p-2 font-medium">Infraction</th>
                   <th className="p-2 text-right font-medium">×</th>
                   <th className="p-2 text-right font-medium">Amende</th>
+                  <th className="p-2 text-right font-medium">Caution</th>
                   <th className="p-2 text-right font-medium">Prison</th>
                   <th className="p-2 text-right font-medium">Points</th>
                   {canManage ? <th className="w-20 p-2" /> : null}
@@ -214,15 +212,20 @@ export function ChargesSection({
                       {charge.isPaid ? <span className="ml-2 text-xs">(réglée)</span> : null}
                     </td>
                     <td className="p-2 text-right font-mono">{charge.count}</td>
-                    <td className="p-2 text-right font-mono">{formatMoney(charge.fine * charge.count)}</td>
+                    <td className="p-2 text-right font-mono">{formatMoney(fineAmount(charge))}</td>
+                    <td className="p-2 text-right font-mono">
+                      {charge.bail == null ? "—" : formatMoney(charge.bail * charge.count)}
+                    </td>
                     <td className="p-2 text-right font-mono">{formatJailTime(charge.jailMinutes * charge.count)}</td>
                     <td className="p-2 text-right font-mono">{charge.points * charge.count || "—"}</td>
                     {canManage ? (
                       <td className="p-2">
-                        <div className="flex justify-end gap-1">
-                          <EditChargeDialog reportId={reportId} charge={charge} />
-                          <RemoveChargeButton reportId={reportId} chargeId={charge.id} />
-                        </div>
+                        {!charge.isPaid ? (
+                          <div className="flex justify-end gap-1">
+                            <EditChargeDialog reportId={reportId} charge={charge} />
+                            <RemoveChargeButton reportId={reportId} chargeId={charge.id} />
+                          </div>
+                        ) : null}
                       </td>
                     ) : null}
                   </tr>
@@ -234,6 +237,7 @@ export function ChargesSection({
                     Total encouru
                   </td>
                   <td className="p-2 text-right font-mono">{formatMoney(totals.fine)}</td>
+                  <td className="p-2 text-right font-mono">{totals.bail ? formatMoney(totals.bail) : "—"}</td>
                   <td className="p-2 text-right font-mono">{formatJailTime(totals.jailMinutes)}</td>
                   <td className="p-2 text-right font-mono">{totals.points || "—"}</td>
                   {canManage ? <td /> : null}

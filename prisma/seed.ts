@@ -56,6 +56,7 @@ const POLICE_TIERS = cumulative([
     "vehicles.flag_stolen",
     "weapons.manage",
     "charges.manage",
+    "charges.collect",
     "warrants.request",
     "bolos.manage",
     "dispatch.calls.create",
