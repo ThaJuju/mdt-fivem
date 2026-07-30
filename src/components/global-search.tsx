@@ -91,6 +91,15 @@ export function GlobalSearch() {
                     <span className="ml-auto text-xs text-muted-foreground">{result.subtitle}</span>
                   </CommandItem>
                 ))}
+                <CommandItem
+                  value={`${group.type}-all-${query}`}
+                  onSelect={() => go(group.allHref)}
+                  className="text-muted-foreground"
+                >
+                  <Search className="size-4" />
+                  Voir tous les résultats
+                  <span className="ml-auto text-xs">{group.label}</span>
+                </CommandItem>
               </CommandGroup>
             </div>
           ))}

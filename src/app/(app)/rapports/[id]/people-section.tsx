@@ -15,6 +15,7 @@ import { CitizenPicker } from "@/components/citizen-picker";
 import { AsyncPicker } from "@/components/async-picker";
 import { INVOLVEMENT_ROLE_LABELS } from "@/lib/labels";
 import { searchOfficers } from "../search";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   addInvolvement,
   removeInvolvement,
@@ -37,6 +38,9 @@ export type OfficerRow = {
   id: string;
   userId: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
   badge: string | null;
   isLead: boolean;
 };
@@ -253,6 +257,12 @@ export function OfficersSection({
             key={officer.id}
             className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"
           >
+            <UserAvatar
+              firstName={officer.firstName}
+              lastName={officer.lastName}
+              avatarUrl={officer.avatarUrl}
+              size="sm"
+            />
             <span className="text-sm">{officer.name}</span>
             {officer.badge ? <span className="font-mono text-xs text-muted-foreground">{officer.badge}</span> : null}
             {officer.isLead ? <Badge variant="secondary">Principal</Badge> : null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Play, Square, Pin } from "lucide-react";
+import { Download, Loader2, Plus, Trash2, Play, Square, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceStrict } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -45,6 +45,7 @@ export type ShiftRow = {
   departmentShortName: string;
   startedAt: string;
   endedAt: string | null;
+  autoClosed: boolean;
 };
 
 export type AnnouncementRow = {
@@ -265,11 +266,17 @@ export function ShiftsSection({
   openShift,
   departments,
   canViewAll,
+  period,
+  totals,
+  hoursByAgent,
 }: {
   shifts: ShiftRow[];
   openShift: ShiftRow | null;
   departments: DepartmentLite[];
   canViewAll: boolean;
+  period: { preset: "week" | "month" | "custom"; startInput: string; endInput: string };
+  totals: { week: number; month: number; period: number };
+  hoursByAgent: { userId: string; userName: string; departmentShortName: string; hours: number }[];
 }) {
   const [startState, startAction, isStarting] = useActionState(startShift, initialState);
   const [endState, endAction, isEnding] = useActionState(endShift, initialState);
@@ -285,6 +292,77 @@ export function ShiftsSection({
         <p className="eyebrow">Présence opérationnelle</p>
         <h2 className="mt-1 text-lg font-semibold">Heures de service</h2>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[
+          ["Semaine en cours", totals.week],
+          ["Mois en cours", totals.month],
+          ["Période affichée", totals.period],
+        ].map(([label, hours]) => (
+          <div key={String(label)} className="rounded-md border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 font-mono text-2xl font-semibold">
+              {new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(Number(hours))} h
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <form className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-card p-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="shift-period">Période</Label>
+          <select
+            id="shift-period"
+            name="period"
+            defaultValue={period.preset}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="week">Semaine en cours</option>
+            <option value="month">Mois en cours</option>
+            <option value="custom">Intervalle libre</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="shift-start">Du</Label>
+          <Input id="shift-start" name="start" type="date" defaultValue={period.startInput} className="w-auto" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="shift-end">Au</Label>
+          <Input id="shift-end" name="end" type="date" defaultValue={period.endInput} className="w-auto" />
+        </div>
+        <Button type="submit" variant="outline" size="sm">Afficher</Button>
+        <Button asChild variant="outline" size="sm">
+          <a href={`/rh/heures.csv?period=${period.preset}&start=${period.startInput}&end=${period.endInput}`}>
+            <Download className="size-4" />
+            Export CSV
+          </a>
+        </Button>
+      </form>
+
+      {canViewAll && hoursByAgent.length > 0 ? (
+        <div className="overflow-x-auto rounded-md border border-border">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border text-left text-muted-foreground">
+              <tr>
+                <th className="p-2 font-medium">Agent</th>
+                <th className="p-2 font-medium">Service</th>
+                <th className="p-2 text-right font-medium">Total période</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hoursByAgent.map((row) => (
+                <tr key={`${row.userId}-${row.departmentShortName}`} className="border-b border-border last:border-0">
+                  <td className="p-2">{row.userName}</td>
+                  <td className="p-2 font-mono text-xs">{row.departmentShortName}</td>
+                  <td className="p-2 text-right font-mono">
+                    {new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(row.hours)} h
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       <div className="panel-surface relative overflow-hidden rounded-lg p-5">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-department to-transparent opacity-60" />
@@ -367,6 +445,9 @@ export function ShiftsSection({
                           locale: fr,
                         })
                       : "en cours"}
+                    {shift.autoClosed ? (
+                      <Badge variant="outline" className="ml-2 text-[10px]">Fermeture automatique</Badge>
+                    ) : null}
                   </td>
                 </tr>
               ))}

@@ -33,6 +33,7 @@ export default async function CitoyensPage({
     ...(q
       ? {
         OR: [
+          { fingerprint: q },
           { firstName: { contains: q, mode: "insensitive" } },
           { lastName: { contains: q, mode: "insensitive" } },
           { phone: { contains: q, mode: "insensitive" } },

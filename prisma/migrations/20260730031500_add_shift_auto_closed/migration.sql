@@ -1,0 +1,2 @@
+ALTER TABLE "Shift"
+ADD COLUMN "autoClosed" BOOLEAN NOT NULL DEFAULT false;

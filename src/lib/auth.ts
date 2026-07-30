@@ -36,6 +36,7 @@ export type Actor = {
   username: string;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
   isSuperAdmin: boolean;
   mustChangePassword: boolean;
   permissions: Set<string>;
@@ -176,6 +177,18 @@ export async function revokeAllSessions(userId: string): Promise<number> {
   return count;
 }
 
+/** Identifiant interne de la session portée par le cookie courant. */
+export async function currentSessionId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const session = await prisma.session.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: { id: true },
+  });
+  return session?.id ?? null;
+}
+
 /**
  * Le service « courant » d'un acteur : son adhésion principale si elle est
  * active, sinon la première adhésion active trouvée. C'est ce service unique
@@ -231,6 +244,14 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     return null;
   }
 
+  // Une écriture au plus par heure et par session : assez précise pour
+  // distinguer un poste actif sans transformer chaque navigation en UPDATE.
+  if (session.lastSeenAt < new Date(Date.now() - 60 * 60 * 1000)) {
+    await prisma.session
+      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
+      .catch(() => {});
+  }
+
   const { user } = session;
   if (!user.isActive) return null;
 
@@ -239,6 +260,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     username: user.username,
     firstName: user.firstName,
     lastName: user.lastName,
+    avatarUrl: user.avatarUrl,
     isSuperAdmin: user.isSuperAdmin,
     mustChangePassword: user.mustChangePassword,
     permissions: computePermissions(user.memberships),
@@ -276,6 +298,10 @@ export async function requireActor(): Promise<Actor> {
  */
 export function can(actor: Actor | null, permission: string): boolean {
   if (!actor) return false;
+  // Tout compte connecté peut modifier les seules données non régaliennes de
+  // son propre profil. Cette permission intrinsèque sert notamment à borner
+  // l'accès à l'upload d'avatar sans dépendre d'un grade.
+  if (permission === "profile.update") return true;
   if (actor.isSuperAdmin) return true;
   const domain = permission.split(".")[0];
   const primary = activePrimaryMembership(actor.memberships);

@@ -3,6 +3,7 @@ import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { NoteForm } from "./note-form";
 import { DeleteNoteButton } from "./delete-note-button";
+import { UserAvatar } from "@/components/user-avatar";
 
 export type NoteRow = {
   id: string;
@@ -10,6 +11,9 @@ export type NoteRow = {
   isFlagged: boolean;
   createdAt: Date;
   authorName: string;
+  authorFirstName: string;
+  authorLastName: string;
+  authorAvatarUrl: string | null;
 };
 
 export function NotesSection({
@@ -37,6 +41,12 @@ export function NotesSection({
                   {note.isFlagged ? (
                     <Badge className="bg-department text-department-foreground">Signalée</Badge>
                   ) : null}
+                  <UserAvatar
+                    firstName={note.authorFirstName}
+                    lastName={note.authorLastName}
+                    avatarUrl={note.authorAvatarUrl}
+                    size="sm"
+                  />
                   <span className="text-xs text-muted-foreground">
                     {note.authorName} · {format(note.createdAt, "dd/MM/yyyy HH:mm", { locale: fr })}
                   </span>

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { REPORT_TYPE_LABELS, REPORT_STATUS_LABELS } from "@/lib/labels";
+import { UserAvatar } from "@/components/user-avatar";
 
 export type ReportRow = {
   id: string;
@@ -15,6 +16,9 @@ export type ReportRow = {
   status: string;
   occurredAt: Date;
   authorName: string;
+  authorFirstName: string;
+  authorLastName: string;
+  authorAvatarUrl: string | null;
   departmentShortName: string;
   departmentColor: string;
 };
@@ -74,7 +78,17 @@ export const columns: ColumnDef<ReportRow>[] = [
   {
     id: "author",
     header: "Auteur",
-    cell: ({ row }) => <span className="text-sm">{row.original.authorName}</span>,
+    cell: ({ row }) => (
+      <span className="flex items-center gap-2 text-sm">
+        <UserAvatar
+          firstName={row.original.authorFirstName}
+          lastName={row.original.authorLastName}
+          avatarUrl={row.original.authorAvatarUrl}
+          size="sm"
+        />
+        {row.original.authorName}
+      </span>
+    ),
   },
   {
     accessorKey: "occurredAt",

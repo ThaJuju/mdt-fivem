@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requireActor, requirePagePermission } from "@/lib/auth";
+import { currentSessionId, requireActor, requirePagePermission } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { ProfileForm } from "./profile-form";
 import { ResetPasswordForm } from "./reset-password-form";
 import { MembershipsSection } from "./memberships-section";
 import { DeleteUserButton } from "./delete-user-button";
+import { SessionsSection } from "@/components/sessions-section";
 
 export const metadata: Metadata = { title: "Détail du compte — Administration — MDT" };
 
@@ -18,10 +19,11 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
 
   const { id } = await params;
 
-  const [user, departments] = await Promise.all([
+  const [user, departments, activeSessionId] = await Promise.all([
     prisma.user.findUnique({
       where: { id },
       include: {
+        sessions: { orderBy: { lastSeenAt: "desc" } },
         memberships: {
           orderBy: { createdAt: "asc" },
           include: { department: true, grade: true },
@@ -32,6 +34,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       orderBy: { order: "asc" },
       include: { grades: { select: { id: true, name: true, level: true } } },
     }),
+    currentSessionId(),
   ]);
 
   if (!user) notFound();
@@ -102,6 +105,20 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           grades: department.grades,
         }))}
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sessions ouvertes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SessionsSection
+            userId={user.id}
+            sessions={user.sessions}
+            currentSessionId={isSelf ? activeSessionId : null}
+            admin={!isSelf}
+          />
+        </CardContent>
+      </Card>
 
       {!isSelf ? (
         <div>

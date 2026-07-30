@@ -69,6 +69,7 @@ model Session {
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -801,6 +802,7 @@ model Shift {
   department   Department @relation(fields: [departmentId], references: [id])
   startedAt    DateTime   @default(now())
   endedAt      DateTime?
+  autoClosed   Boolean    @default(false)
 
   @@index([userId])
   @@index([departmentId])

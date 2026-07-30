@@ -42,10 +42,15 @@ export function CitizenPicker({
     }, 250);
   }
 
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (nextOpen && results.length === 0) handleSearch("");
+  }
+
   return (
     <div className="flex items-center gap-2">
       <input type="hidden" name={name} value={selected?.id ?? ""} />
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             type="button"

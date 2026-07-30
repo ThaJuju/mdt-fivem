@@ -47,6 +47,7 @@ const UPLOAD_QUOTA: RateLimitRule = { limit: 60, windowMs: 15 * 60 * 1000 };
 
 /** Modules dont un formulaire accepte une image. */
 const UPLOAD_PERMISSIONS = [
+  "profile.update",
   "citizens.create",
   "citizens.edit",
   "vehicles.create",
@@ -87,20 +88,36 @@ export async function POST(request: Request) {
 
   const formData = await request.formData().catch(() => null);
   const file = formData?.get("file");
+  const purpose = formData?.get("purpose");
+  if (
+    purpose !== "avatar" &&
+    !UPLOAD_PERMISSIONS.filter((permission) => permission !== "profile.update").some((permission) =>
+      can(actor, permission),
+    )
+  ) {
+    return NextResponse.json(
+      { error: "Votre grade ne vous autorise pas à envoyer une image pour ce module." },
+      { status: 403 },
+    );
+  }
+  const maxBytes = purpose === "avatar" ? 1024 * 1024 : MAX_UPLOAD_BYTES;
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Aucun fichier reçu." }, { status: 400 });
   }
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (file.size > maxBytes) {
     return NextResponse.json(
-      { error: "Image trop lourde : 5 Mo maximum. Réduisez-la avant de réessayer." },
+      { error: `Image trop lourde : ${purpose === "avatar" ? "1 Mo" : "5 Mo"} maximum. Réduisez-la avant de réessayer.` },
       { status: 413 },
     );
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   // Deuxième contrôle de taille : `file.size` est déclaratif, `bytes` est réel.
-  if (bytes.byteLength > MAX_UPLOAD_BYTES) {
-    return NextResponse.json({ error: "Image trop lourde : 5 Mo maximum." }, { status: 413 });
+  if (bytes.byteLength > maxBytes) {
+    return NextResponse.json(
+      { error: `Image trop lourde : ${purpose === "avatar" ? "1 Mo" : "5 Mo"} maximum.` },
+      { status: 413 },
+    );
   }
 
   const format = detectImageFormat(bytes);

@@ -95,6 +95,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     username: actor.username,
     firstName: actor.firstName,
     lastName: actor.lastName,
+    avatarUrl: actor.avatarUrl,
     isSuperAdmin: actor.isSuperAdmin,
     permissions: [...actor.permissions],
     memberships: actor.memberships,

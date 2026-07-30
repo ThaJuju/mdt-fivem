@@ -6,15 +6,15 @@ import { fr } from "date-fns/locale";
 import { requireActor, requirePagePermission, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { REPORT_TYPE_LABELS, REPORT_STATUS_LABELS } from "@/lib/labels";
-import { ReportForm } from "../report-form";
+import { ReportDetailsCard } from "./report-details-card";
 import { InvolvementsSection, OfficersSection } from "./people-section";
 import { ReportVehiclesSection, EvidenceSection } from "./attachments-section";
 import { ChargesSection } from "./charges-section";
 import { EmsSection } from "./ems-section";
 import { WorkflowBar } from "./workflow-bar";
+import { UserAvatar } from "@/components/user-avatar";
 
 export const metadata: Metadata = { title: "Rapport — MDT" };
 
@@ -33,7 +33,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
   const report = await prisma.report.findUnique({
     where: { id },
     include: {
-      author: { select: { firstName: true, lastName: true } },
+      author: { select: { firstName: true, lastName: true, avatarUrl: true } },
       approvedBy: { select: { firstName: true, lastName: true } },
       department: { select: { id: true, shortName: true, name: true, color: true } },
       involvements: { include: { citizen: { select: { id: true, firstName: true, lastName: true } } } },
@@ -44,6 +44,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
               id: true,
               firstName: true,
               lastName: true,
+              avatarUrl: true,
               memberships: {
                 where: { isPrimary: true },
                 select: { badgeNumber: true, department: { select: { shortName: true } } },
@@ -185,7 +186,13 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
               />
               {report.department.shortName}
             </span>
-            <span>
+            <span className="flex items-center gap-1.5">
+              <UserAvatar
+                firstName={report.author.firstName}
+                lastName={report.author.lastName}
+                avatarUrl={report.author.avatarUrl}
+                size="sm"
+              />
               par {report.author.firstName} {report.author.lastName} ·{" "}
               {format(report.occurredAt, "dd/MM/yyyy à HH:mm", { locale: fr })}
             </span>
@@ -200,26 +207,19 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{canEdit ? "Rapport" : "Rapport (lecture seule)"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ReportForm
-            departments={departments}
-            readOnly={!canEdit}
-            report={{
-              id: report.id,
-              type: report.type,
-              title: report.title,
-              content: report.content,
-              location: report.location,
-              occurredAt: toDateTimeLocal(report.occurredAt),
-              departmentId: report.departmentId,
-            }}
-          />
-        </CardContent>
-      </Card>
+      <ReportDetailsCard
+        departments={departments}
+        canEdit={canEdit}
+        report={{
+          id: report.id,
+          type: report.type,
+          title: report.title,
+          content: report.content,
+          location: report.location,
+          occurredAt: toDateTimeLocal(report.occurredAt),
+          departmentId: report.departmentId,
+        }}
+      />
 
       <OfficersSection
         reportId={report.id}
@@ -228,6 +228,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
           id: officer.id,
           userId: officer.userId,
           name: `${officer.user.firstName} ${officer.user.lastName}`,
+          firstName: officer.user.firstName,
+          lastName: officer.user.lastName,
+          avatarUrl: officer.user.avatarUrl,
           badge: officer.user.memberships[0]
             ? `${officer.user.memberships[0].department.shortName} #${officer.user.memberships[0].badgeNumber}`
             : null,
