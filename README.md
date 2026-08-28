@@ -14,15 +14,18 @@ l'économie in-game.
 
 ## ⚠️ État du projet : en chantier
 
-**Le panel n'est pas terminé.** Il est utilisable et l'ensemble des modules
-décrits plus bas est en place, mais le projet est encore en développement
-actif : des écrans restent à finir ou à peaufiner, des comportements peuvent
-changer, et tout n'a pas été éprouvé en conditions réelles. Aucune passe de
-vérification visuelle complète n'a été faite — la validation s'est faite par
-requêtes HTTP contre le serveur.
+**Le panel n'est pas terminé, et n'est plus développé activement.** Il est
+utilisable et l'ensemble des modules décrits plus bas est en place, mais des
+écrans restent à finir ou à peaufiner et tout n'a pas été éprouvé en conditions
+réelles. Aucune passe de vérification visuelle complète n'a été faite — la
+validation s'est faite par requêtes HTTP contre le serveur.
+
+Le dépôt est publié en l'état, sans engagement de maintenance : les issues et
+les pull requests ne recevront pas forcément de réponse. Reprenez-le, forkez-le,
+adaptez-le — c'est justement à ça que sert la licence MIT.
 
 À prendre pour ce que c'est : une base solide et fonctionnelle, pas un produit
-fini. Les bugs et les manques sont attendus ; les issues sont les bienvenues.
+fini.
 
 ## Ce que ça fait
 
@@ -140,7 +143,8 @@ résolution des permissions, cloisonnement par service, lecture de l'adresse
 client derrière le proxy, limitation de débit, règles d'envoi de fichiers,
 cohérence du catalogue de permissions, balayage d'expiration. La CI
 (`.github/workflows/ci.yml`) rejoue `prisma generate`, lint, typecheck et tests
-sur chaque poussée et chaque pull request.
+sur chaque poussée et chaque pull request. Le projet n'étant plus suivi, le
+plus simple est sans doute de forker.
 
 [CLAUDE.md](CLAUDE.md) contient les notes d'architecture détaillées : c'est le
 document à lire avant de toucher aux permissions, aux sessions, au temps réel
@@ -151,5 +155,4 @@ c'est l'objet de l'issue #27.
 
 ## Licence
 
-Aucune licence n'est déclarée pour l'instant : tous droits réservés. Ouvrez une
-issue si vous souhaitez réutiliser le code.
+[MIT](LICENSE). Faites-en ce que vous voulez, sans garantie.
